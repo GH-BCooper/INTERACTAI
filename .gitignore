@@ -1,0 +1,125 @@
+# InteractAI — see CLAUDE.md §12 and docs/phase-0-BUILD.md TASK 0.1.
+# Explicitly required: .env, models/, *.wav/*.pcm/*.opus, kaggle.json, wandb/, data/raw/.
+#
+# NOT ignored on purpose — do not add these later:
+#   content/                              authored YAML data, not a build artefact
+#   packages/schema generated output      committed; CI's schema-drift job diffs against it
+#   uv.lock, pnpm-lock.yaml               lockfiles, always committed
+#   tests/fixtures/audio/                 committed audio fixtures (see exception below)
+
+# ── Secrets & environment ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+.envrc
+kaggle.json
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+certs/
+secrets/
+
+# ── Python — services/{api,realtime,coach,training} ────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.tox/
+.nox/
+.ipynb_checkpoints/
+
+# ── Node / pnpm / Next.js — apps/web, packages/schema ───────────────────────
+node_modules/
+.pnpm-store/
+.pnp.*
+.next/
+out/
+.turbo/
+.vercel
+next-env.d.ts
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+
+# ── Docker ───────────────────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── Models, weights & ML training artefacts ─────────────────────────────────
+# CLAUDE.md: never commit weights. Downloaded by docs/01-SETUP-GUIDE.md §3.
+models/
+wandb/
+checkpoints/
+runs/
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.safetensors
+data/
+
+# ── Audio & media ────────────────────────────────────────────────────────
+# CLAUDE.md §1.8: never store persona audio — regenerable from transcript + voice id.
+*.wav
+*.pcm
+*.opus
+*.mp3
+*.ogg
+*.flac
+*.m4a
+!tests/fixtures/audio/**
+
+# ── Editors & IDE ────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.claude/settings.local.json
+
+# ── OS cruft ─────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── Logs & runtime ───────────────────────────────────────────────────────
+*.log
+logs/
+*.pid
+*.tmp
+tmp/
+.cache/
+*.orig
+*.rej
+*.bak
