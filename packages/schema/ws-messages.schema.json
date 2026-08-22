@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interactai.dev/schema/ws-messages.schema.json",
+  "title": "InteractAI WebSocket Messages",
+  "description": "GENERATED SOURCE OF TRUTH — see CLAUDE.md §1.3 and docs/phase-0-BUILD.md TASK 0.3. Changing this file is a versioned protocol migration, not a refactor. Run `make schema` after any edit.",
+  "oneOf": [
+    { "$ref": "#/$defs/hello" },
+    { "$ref": "#/$defs/resume" },
+    { "$ref": "#/$defs/mute" },
+    { "$ref": "#/$defs/end_session" },
+    { "$ref": "#/$defs/ping" },
+    { "$ref": "#/$defs/ready" },
+    { "$ref": "#/$defs/state_change" },
+    { "$ref": "#/$defs/partial_transcript" },
+    { "$ref": "#/$defs/turn_finalized" },
+    { "$ref": "#/$defs/persona_text" },
+    { "$ref": "#/$defs/audio_chunk_meta" },
+    { "$ref": "#/$defs/interrupted" },
+    { "$ref": "#/$defs/degraded" },
+    { "$ref": "#/$defs/latency_report" },
+    { "$ref": "#/$defs/session_closed" },
+    { "$ref": "#/$defs/error" },
+    { "$ref": "#/$defs/pong" }
+  ],
+  "discriminator": { "propertyName": "type" },
+
+  "$defs": {
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Monotonic uint32, per direction (client and server each keep their own counter)."
+    },
+
+    "server_machine_state": {
+      "type": "string",
+      "description": "The 10 realtime turn/connection states (protocol_version 1.1). See docs/decisions/0001-realtime-state-machine.md and docs/decisions/0008-phase-2-state-machine.md.",
+      "enum": ["connecting", "idle", "listening", "endpointing", "thinking", "speaking", "interrupted", "closing", "degraded", "closed"]
+    },
+    "client_state": {
+      "type": "string",
+      "description": "The 5 user-visible states the practice-room UI renders (protocol_version 1.1). Collapses server_machine_state — see docs/decisions/0008-phase-2-state-machine.md.",
+      "enum": ["your_turn", "thinking", "speaking", "connection_trouble", "ended"]
+    },
+
+    "word_timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["word", "start_ms", "end_ms"],
+      "properties": {
+        "word": { "type": "string" },
+        "start_ms": { "type": "integer", "minimum": 0 },
+        "end_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "latency_stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "duration_ms"],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "description": "Fixed enum — CLAUDE.md §8.",
+          "enum": ["endpoint_detect", "asr_finalize", "prompt_assemble", "model_ttft", "first_chunk_assemble", "tts_first_chunk", "transport", "e2e"]
+        },
+        "duration_ms": { "type": "number", "minimum": 0 }
+      }
+    },
+
+    "hello": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "protocol_version", "session_id", "client_sample_rate", "client_frame_ms", "capabilities"],
+      "properties": {
+        "type": { "const": "hello" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "protocol_version": { "type": "string", "description": "e.g. \"1.0\". Mismatched major version -> error ORCHESTRATION_PROTOCOL_MISMATCH, fatal." },
+        "session_id": { "type": "string", "format": "uuid" },
+        "client_sample_rate": { "type": "integer", "minimum": 1 },
+        "client_frame_ms": { "type": "integer", "minimum": 1 },
+        "capabilities": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "resume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "protocol_version", "session_id", "last_server_seq", "last_client_seq"],
+      "properties": {
+        "type": { "const": "resume" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "protocol_version": { "type": "string" },
+        "session_id": { "type": "string", "format": "uuid" },
+        "last_server_seq": { "$ref": "#/$defs/seq" },
+        "last_client_seq": { "$ref": "#/$defs/seq" }
+      }
+    },
+    "mute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "muted"],
+      "properties": {
+        "type": { "const": "mute" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "muted": { "type": "boolean" }
+      }
+    },
+    "end_session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "reason"],
+      "properties": {
+        "type": { "const": "end_session" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "reason": { "type": "string", "enum": ["user_hangup", "user_abandoned"] }
+      }
+    },
+    "ping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "client_time_ms"],
+      "properties": {
+        "type": { "const": "ping" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "client_time_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "ready": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "session_id", "server_sample_rate", "protocol_version", "resumed"],
+      "properties": {
+        "type": { "const": "ready" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "session_id": { "type": "string", "format": "uuid" },
+        "server_sample_rate": { "type": "integer", "minimum": 1 },
+        "protocol_version": { "type": "string" },
+        "resumed": { "type": "boolean" }
+      }
+    },
+    "state_change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "state", "client_state", "at_ms"],
+      "properties": {
+        "type": { "const": "state_change" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "state": { "$ref": "#/$defs/server_machine_state" },
+        "client_state": { "$ref": "#/$defs/client_state" },
+        "at_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "partial_transcript": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "turn_index", "text", "stability", "at_ms"],
+      "properties": {
+        "type": { "const": "partial_transcript" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "turn_index": { "type": "integer", "minimum": 0 },
+        "text": { "type": "string" },
+        "stability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "at_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "turn_finalized": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "turn_id", "turn_index", "text", "start_ms", "end_ms", "asr_confidence", "word_timings"],
+      "properties": {
+        "type": { "const": "turn_finalized" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "turn_id": { "type": "string", "format": "uuid" },
+        "turn_index": { "type": "integer", "minimum": 0 },
+        "text": { "type": "string" },
+        "start_ms": { "type": "integer", "minimum": 0 },
+        "end_ms": { "type": "integer", "minimum": 0 },
+        "asr_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "word_timings": { "type": "array", "items": { "$ref": "#/$defs/word_timing" } }
+      }
+    },
+    "persona_text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "turn_id", "text_delta", "done"],
+      "properties": {
+        "type": { "const": "persona_text" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "turn_id": { "type": "string", "format": "uuid" },
+        "text_delta": { "type": "string" },
+        "done": { "type": "boolean" }
+      }
+    },
+    "audio_chunk_meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "turn_id", "chunk_seq", "sample_rate", "byte_length", "is_final"],
+      "properties": {
+        "type": { "const": "audio_chunk_meta" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "turn_id": { "type": "string", "format": "uuid" },
+        "chunk_seq": { "type": "integer", "minimum": 0 },
+        "sample_rate": { "type": "integer", "minimum": 1 },
+        "byte_length": { "type": "integer", "minimum": 0 },
+        "is_final": { "type": "boolean" }
+      }
+    },
+    "interrupted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "turn_id", "at_ms", "truncated_text"],
+      "properties": {
+        "type": { "const": "interrupted" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "turn_id": { "type": "string", "format": "uuid" },
+        "at_ms": { "type": "integer", "minimum": 0 },
+        "truncated_text": { "type": "string" }
+      }
+    },
+    "degraded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "component", "message", "recoverable"],
+      "properties": {
+        "type": { "const": "degraded" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "component": { "type": "string", "enum": ["asr", "tts", "persona", "transport"] },
+        "message": { "type": "string" },
+        "recoverable": { "type": "boolean" }
+      }
+    },
+    "latency_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "turn_id", "stages", "e2e_ms"],
+      "properties": {
+        "type": { "const": "latency_report" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "turn_id": { "type": "string", "format": "uuid" },
+        "stages": { "type": "array", "items": { "$ref": "#/$defs/latency_stage" } },
+        "e2e_ms": { "type": "number", "minimum": 0 }
+      }
+    },
+    "session_closed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "reason", "duration_ms", "report_pending"],
+      "properties": {
+        "type": { "const": "session_closed" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "reason": { "type": "string" },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "report_pending": { "type": "boolean" }
+      }
+    },
+    "error": {
+      "title": "WsError",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "code", "message", "recovery", "fatal", "trace_id"],
+      "properties": {
+        "type": { "const": "error" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "recovery": { "type": "string" },
+        "fatal": { "type": "boolean" },
+        "trace_id": { "type": "string" }
+      }
+    },
+    "pong": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "seq", "client_time_ms", "server_time_ms"],
+      "properties": {
+        "type": { "const": "pong" },
+        "seq": { "$ref": "#/$defs/seq" },
+        "client_time_ms": { "type": "integer", "minimum": 0 },
+        "server_time_ms": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

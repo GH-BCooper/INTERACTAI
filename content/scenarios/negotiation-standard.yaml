@@ -1,0 +1,48 @@
+slug: negotiation-standard
+family: negotiation
+difficulty: standard
+title: Salary negotiation after a lowball offer — standard
+persona_slug: neutral-hiring-manager
+rubric_slug: negotiation
+duration_minutes: 20
+tags: [negotiation, offer]
+brief: |
+  You are the hiring manager delivering an offer that landed about 15% below the candidate's
+  stated target, because finance capped the band for this role before you could push back
+  internally. You believe in the candidate but you are not the recruiter — you have a real
+  budget constraint and limited unilateral authority to move the number. You will not
+  volunteer that constraint unless asked directly about flexibility. You listen to their case
+  without interrupting, and you respond evenly whether their number is reasonable or a
+  stretch. You are willing to trade in other levers — start date, a title bump, an equity
+  refresh — if the candidate asks about anything beyond base salary, but you will not offer
+  those unprompted.
+opening_strategy: |
+  State the offer number plainly and ask what questions they have, without softening it or
+  apologizing for the number.
+difficulty_params:
+  gentle:
+    followups_on_vague: 0
+    hint_after_pause_ms: 4000
+    interrupt_over_words: null
+    ack_length: long
+    silence_after_answer_ms: 0
+    lowball_percent_below_target: 8
+    room_to_move_percent: 10
+  standard:
+    followups_on_vague: 1
+    hint_after_pause_ms: null
+    interrupt_over_words: null
+    ack_length: short
+    silence_after_answer_ms: 0
+    lowball_percent_below_target: 15
+    room_to_move_percent: 6
+  hard:
+    followups_on_vague: 3
+    hint_after_pause_ms: null
+    interrupt_over_words: 120
+    ack_length: minimal
+    silence_after_answer_ms: 1500
+    challenge_claims: true
+    time_pressure: true
+    lowball_percent_below_target: 22
+    room_to_move_percent: 3

@@ -1,0 +1,90 @@
+slug: negotiation
+name: Negotiation
+description: >
+  Applies to the negotiation scenario family. The five universal criteria plus anchoring,
+  justification and concession_discipline, which capture the specific mechanics of holding
+  and moving a number in a compensation conversation.
+# See content/rubrics/general_interview.yaml for the policy field meanings.
+aggregation_policy:
+  method: mean_weighted_by_confidence
+  min_turns_with_signal: 2
+criteria:
+  - key: structure
+    name: Structure
+    description: Does the answer have a discernible arc rather than a stream of facts?
+    anchor_descriptors:
+      "1": "No discernible organisation. The answer starts mid-thought or never resolves."
+      "2": "Facts in the order they occurred to the speaker, with no signposting — a listener would need to ask how it ended."
+      "3": "Recognisable beginning and end, but the middle wanders or the order has to be reconstructed by the listener."
+      "4": "A clear arc with one weak transition or a missing close. Still easy to follow throughout."
+      "5": "Opens by naming the situation, moves through action to outcome, and closes by returning to the question asked."
+
+  - key: specificity
+    name: Specificity
+    description: Does the answer name concrete details rather than staying abstract?
+    anchor_descriptors:
+      "1": "Entirely abstract — no names, numbers, tools, or concrete artifacts mentioned anywhere in the answer."
+      "2": "One concrete detail surfaces only when asked directly; the rest of the answer stays generic."
+      "3": "A few concrete details appear unprompted, but key claims about impact or scale remain unquantified."
+      "4": "Most claims carry a specific number, name, or artifact; one or two remain vague even on request."
+      "5": "Every material claim is anchored to a number, a named tool or person, or a decision the listener could verify."
+
+  - key: relevance
+    name: Relevance
+    description: Does the answer address the question asked, or drift to a more comfortable topic?
+    anchor_descriptors:
+      "1": "The answer addresses a different question than the one asked and never returns to it."
+      "2": "The answer opens on-topic but drifts within the first third and never comes back to the question."
+      "3": "The answer covers the question but pads it with tangential detail a listener would need to skip past."
+      "4": "The answer stays on topic throughout, with only brief detours that are clearly flagged as asides."
+      "5": "Every sentence serves the question asked; nothing would need to be cut to tighten the answer."
+
+  - key: concision
+    name: Concision
+    description: Does the answer take the shortest path to a complete response?
+    anchor_descriptors:
+      "1": "The answer repeats the same point three or more times in different words without adding information."
+      "2": "The answer eventually lands the point but takes roughly twice as long as the content requires."
+      "3": "The answer has one clear redundant pass — a restatement or a false start — before settling."
+      "4": "The answer is efficient with a single minor detour that a light edit would remove entirely."
+      "5": "The answer reaches the point directly and stops once it is made, with no restatement anywhere."
+
+  - key: confidence
+    name: Confidence
+    description: Does the delivery convey that the speaker trusts their own position?
+    anchor_descriptors:
+      "1": "The answer is dominated by hedges such as 'I guess' or 'maybe' on claims the speaker should know cold."
+      "2": "Hedging appears on more than half of the answer's key claims, including the candidate's own stated number."
+      "3": "The answer hedges on the harder half of its claims but states the easier ones plainly and directly."
+      "4": "The answer states claims plainly with occasional hedging only where the uncertainty is genuine."
+      "5": "The answer states every claim plainly and flags uncertainty only where it is genuinely warranted."
+
+  - key: anchoring
+    name: Anchoring
+    description: Does the candidate state a specific number early and hold it, rather than letting the other side's number set the frame?
+    anchor_descriptors:
+      "1": "The candidate never states their own number; the conversation proceeds entirely on the other side's terms."
+      "2": "The candidate states a number only when directly pressed for one, well after the other side's anchor has stood."
+      "3": "The candidate states a number but frames it as a hope rather than a position, such as 'it would be nice to reach X'."
+      "4": "The candidate states a clear number early and holds it once, before showing any movement on it."
+      "5": "The candidate states a clear number early, ties it to a stated rationale, and does not drift until a real concession is exchanged for it."
+
+  - key: justification
+    name: Justification
+    description: Does the candidate back their ask with external evidence rather than personal need?
+    anchor_descriptors:
+      "1": "The only justification offered is personal circumstance, such as 'I really need this', with no external reference point."
+      "2": "The candidate gestures at market rate or a competing offer without any specifics a listener could check."
+      "3": "The candidate cites one specific external reference point but does not connect it to their own ask."
+      "4": "The candidate cites a specific external reference point and explicitly ties it to the number requested."
+      "5": "The candidate cites multiple independent external reference points and shows exactly how they combine to justify the specific number asked."
+
+  - key: concession_discipline
+    name: Concession discipline
+    description: When the candidate moves off their opening number, do they extract something in return?
+    anchor_descriptors:
+      "1": "The candidate concedes to the other side's number without asking for anything in exchange."
+      "2": "The candidate concedes and asks for something in return only after the new number is already agreed."
+      "3": "The candidate asks for something in return, but it is vague, such as 'some flexibility', rather than a specific term."
+      "4": "The candidate trades a specific concession for a specific term — start date, sign-on, title — in the same exchange."
+      "5": "Every concession the candidate makes is paired with a specific, named trade in the same breath, and the size of the trade tracks the size of the concession."

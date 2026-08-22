@@ -1,0 +1,87 @@
+[project]
+name = "interactai"
+version = "0.1.0"
+description = "InteractAI — real-time multi-agent voice simulator. Root tooling and scripts."
+requires-python = "==3.11.*"
+dependencies = [
+    "python-dotenv>=1.2.3",
+    "pyyaml>=6.0.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.0",
+    "mypy>=1.14.0",
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.25.0",
+    "pytest-cov>=6.0.0",
+    "testcontainers[postgres,redis]>=4.9.0",
+    "httpx>=0.28.0",
+    "datamodel-code-generator>=0.31.0",
+    "types-pyyaml>=6.0.12.20250915",
+    "piper-tts>=1.7.0",  # scripts/generate_audio_fixtures.py
+    "sounddevice>=0.5.1",  # scripts/cli.py — the CLI voice harness only, never services/realtime
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["services/api", "services/realtime", "services/coach", "services/training"]
+
+# ── Ruff — root config, applies to every Python service ──────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# docs/ holds the reference spec markdown files (phase-*-BUILD.md, phase-*-LEARN.md) — ruff's
+# markdown support reaches into their embedded Python code-fence examples otherwise, and those
+# aren't project source to lint or reformat.
+extend-exclude = ["*/alembic/versions/*", "docs/"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "ASYNC", "S"]
+# S101 (assert) is fine in tests; per-file-ignores below narrows it there.
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"scripts/**" = ["S101"]
+"*/tests/**" = ["S101"]
+# Generated — line length isn't ours to control (long JSON Schema `description` strings).
+"services/realtime/app/schemas/ws.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+# ── mypy — strict only on services/realtime per CLAUDE.md §4 ────────────────
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+exclude = ["alembic/versions"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "services.realtime.*"
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# No py.typed marker / stubs published for any of these (Task 1.3/1.4/1.5).
+module = ["onnxruntime.*", "faster_whisper.*", "piper.*", "sounddevice.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# Session-scoped: db_engine (tests/integration/conftest.py) holds one testcontainers Postgres
+# + async engine for the whole run. Async engines/connections are event-loop-bound, so a
+# session-scoped fixture needs a session-scoped loop too, or the default per-test loop churn
+# breaks it with asyncpg "another operation is in progress" errors on the second test.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "safety: live-model safety suite (CLAUDE.md §7/Task 2.6) — real Groq/Ollama calls, slow, never skipped in CI.",
+]

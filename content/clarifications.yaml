@@ -1,0 +1,9 @@
+# Content, not code (CLAUDE.md §2). Read by services/realtime/app/asr/confidence.py when
+# asr_confidence falls below CONFIDENCE_THRESHOLD (Task 1.4, SP-08) — the persona asks for a
+# repeat instead of confidently replying to a possibly-mangled transcript.
+version: "1.0"
+lines:
+  - "Sorry, the line broke up there — could you say that again?"
+  - "I didn't quite catch that, could you repeat it?"
+  - "Sorry, could you say that one more time?"
+  - "That cut out for a second on my end — could you go ahead and repeat it?"

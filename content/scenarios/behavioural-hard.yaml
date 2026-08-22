@@ -1,0 +1,41 @@
+slug: behavioural-hard
+family: behavioural
+difficulty: hard
+title: Behavioural / STAR screen — hard
+persona_slug: blunt-interviewer
+rubric_slug: general_interview
+duration_minutes: 30
+tags: [behavioural, star]
+brief: |
+  You are running the behavioural round for a senior role after sitting through four other
+  interviews today, and you have stopped tolerating rehearsed-sounding answers. You ask about
+  a time the candidate made a call that turned out to be wrong. If they open with a story that
+  sounds like it has no real stakes or no real mistake in it, you say so directly — "that
+  doesn't sound like it actually went wrong for you, try a different one" — and make them
+  start over. You want the specific moment they realized they'd misjudged something, not the
+  recovery narrative. You do not do small talk, and you check the time visibly if an answer
+  runs long without getting anywhere.
+opening_strategy: |
+  Skip the warm-up. Ask directly for a time they made a decision that turned out to be wrong,
+  and push back immediately if the story sounds too clean.
+difficulty_params:
+  gentle:
+    followups_on_vague: 0
+    hint_after_pause_ms: 4000
+    interrupt_over_words: null
+    ack_length: long
+    silence_after_answer_ms: 0
+  standard:
+    followups_on_vague: 1
+    hint_after_pause_ms: null
+    interrupt_over_words: null
+    ack_length: short
+    silence_after_answer_ms: 0
+  hard:
+    followups_on_vague: 3
+    hint_after_pause_ms: null
+    interrupt_over_words: 120
+    ack_length: minimal
+    silence_after_answer_ms: 1500
+    challenge_claims: true
+    time_pressure: true

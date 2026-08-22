@@ -1,0 +1,21 @@
+{
+  "name": "@interactai/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Next.js App Router shell. Built out in Phase 3+ (docs/phase-3-BUILD.md); this workspace exists now so generated types and their tests have a home (Task 0.3).",
+  "scripts": {
+    "dev": "echo \"apps/web has no app yet — the Next.js shell arrives in Phase 3. Nothing to serve.\"",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^22.10.5",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.19.0",
+    "vitest": "^3.0.4"
+  }
+}

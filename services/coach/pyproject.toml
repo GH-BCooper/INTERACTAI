@@ -1,0 +1,19 @@
+[project]
+name = "interactai-coach"
+version = "0.1.0"
+description = "ARQ worker — off the latency path. Consumes completed turns, runs the scorer and narrator, writes scores and reports. Built out in Phase 2+."
+requires-python = "==3.11.*"
+dependencies = [
+    "arq>=0.26.0",
+    "litellm>=1.97.0",
+    "sqlalchemy[asyncio]>=2.0.52",
+    "asyncpg>=0.30.0",
+    "redis>=5.2.0",
+    "uuid-utils>=0.10.0",
+    "structlog>=24.4.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.7.0",
+]
+
+[tool.uv]
+package = false

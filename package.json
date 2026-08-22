@@ -1,16 +1,19 @@
 {
   "name": "interactai",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
+  "version": "0.1.0",
+  "private": true,
+  "description": "InteractAI — real-time multi-agent voice simulator.",
   "author": "Brett Cooper",
   "license": "ISC",
-  "type": "module"
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "schema:ts": "pnpm --filter @interactai/schema run generate:ts",
+    "test:web": "pnpm --filter @interactai/web run test",
+    "lint:web": "pnpm --filter @interactai/web run lint && pnpm --filter @interactai/web run typecheck",
+    "dev:web": "pnpm --filter @interactai/web run dev"
+  }
 }

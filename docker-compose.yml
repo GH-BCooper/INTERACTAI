@@ -1,0 +1,87 @@
+# InteractAI local infrastructure — see CLAUDE.md §2/§3 and docs/phase-0-BUILD.md TASK 0.2.
+#
+# api, realtime, coach and web are deliberately NOT containerised here — they run on the
+# host with hot reload for fast local iteration. Production Dockerfiles arrive in Phase 6.
+#
+# Host ports are overridable (a native Postgres/Redis/MinIO install is common enough on dev
+# machines to make this the default, not a workaround). Defaults below match .env.example.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-interactai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-interactai}
+      POSTGRES_DB: ${POSTGRES_DB:-interactai}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/db/init-extensions.sql:/docker-entrypoint-initdb.d/01-init-extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-interactai} -d ${POSTGRES_DB:-interactai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [interactai]
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [interactai]
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    ports:
+      - "${MINIO_API_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [interactai]
+
+  # One-shot: creates the private interactai-audio bucket, then exits. Re-running `make up`
+  # must not error on a bucket that already exists — `mc mb --ignore-existing` guarantees that.
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-interactai-audio}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 \"$$S3_ACCESS_KEY\" \"$$S3_SECRET_KEY\" &&
+      mc mb --ignore-existing local/$$S3_BUCKET &&
+      mc anonymous set none local/$$S3_BUCKET &&
+      echo 'bucket ready: '$$S3_BUCKET
+      "
+    networks: [interactai]
+
+networks:
+  interactai:
+    name: interactai
+
+# Named volumes, not bind mounts, for data. `make clean` removes them; nothing else does.
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:

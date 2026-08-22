@@ -1,0 +1,30 @@
+[project]
+name = "interactai-realtime"
+version = "0.1.0"
+description = "The latency-critical service. One WebSocket per session: VAD, endpointing, ASR streaming, persona, TTS streaming. Stateful. Built out in Phase 1+."
+requires-python = "==3.11.*"
+dependencies = [
+    "fastapi>=0.141.1",
+    "uvicorn[standard]>=0.34.0",
+    "websockets>=14.1",
+    "numpy>=2.4.6",
+    "onnxruntime>=1.29.0",
+    "faster-whisper>=1.2.1",
+    "piper-tts>=1.7.0",
+    "litellm>=1.97.0",
+    "av>=14.0.0",
+    "sqlalchemy[asyncio]>=2.0.52",
+    "asyncpg>=0.30.0",
+    "redis>=5.2.0",
+    "uuid-utils>=0.10.0",
+    "structlog>=24.4.0",
+    "pydantic-settings>=2.7.0",
+    "pyjwt>=2.10.0",
+    "pyyaml>=6.0.2",
+    "boto3>=1.35.0",
+    "arq>=0.26.0",
+    "jinja2>=3.1.4",
+]
+
+[tool.uv]
+package = false
