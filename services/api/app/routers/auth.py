@@ -70,12 +70,24 @@ async def login(
 @router.get("/{provider}/callback", dependencies=[Depends(_enforce_auth_rate_limit)])
 async def callback(
     provider: Literal["github", "google"],
-    response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
     code: Annotated[str, Query()],
     state: Annotated[str, Query()],
-) -> TokenResponse:
+) -> Response:
+    """The OAuth provider redirects the browser here directly (this is a top-level navigation,
+    not a fetch a frontend origin could intercept) — so this handler's job isn't to hand the
+    access token back to *a caller*, it's to get the browser to `WEB_ORIGIN` with one. Task
+    3.1's app shell needs a real sign-in flow, and returning JSON here (the original Phase 0
+    shape) would just strand the user on a bare API response with no way for the SPA to ever see
+    the token (docs/decisions/0013).
+
+    The refresh token still goes in the httpOnly cookie exactly as before — that's a `Set-Cookie`
+    header on this same redirect response, unaffected by the body changing from JSON to a
+    Location header. The access token travels in the URL **fragment** (`#...`), not a query
+    string: fragments are never sent to the server on the next request and never appear in
+    server access logs, which matters for a value that's otherwise bearer-equivalent for 15
+    minutes."""
     settings = get_settings()
 
     if not await consume_oauth_state(redis, state):
@@ -99,11 +111,12 @@ async def callback(
 
     access_token = create_access_token(str(user.id))
     refresh_token = await create_refresh_family(redis, str(user.id))
-    _set_refresh_cookie(response, refresh_token)
 
-    return TokenResponse(
-        access_token=access_token, expires_in=settings.access_token_ttl_minutes * 60
-    )
+    expires_in = settings.access_token_ttl_minutes * 60
+    location = f"{settings.web_origin}/auth/callback#token={access_token}&expires_in={expires_in}"
+    response = Response(status_code=307, headers={"Location": location})
+    _set_refresh_cookie(response, refresh_token)
+    return response
 
 
 @router.post("/refresh")

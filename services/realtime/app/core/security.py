@@ -54,3 +54,32 @@ def token_expiry_unix(token_payload_exp: int) -> bool:
     """True if the given `exp` claim (unix seconds) is in the past. Split out only so the
     handshake tests can assert the exp check independently of Redis burn ordering."""
     return token_payload_exp < int(time.time())
+
+
+@dataclass(frozen=True)
+class ReplayTokenClaims:
+    session_id: str
+    user_id: str
+
+
+def validate_replay_token(token: str, *, expected_session_id: str) -> ReplayTokenClaims:
+    """Task 3.4d's on-demand persona-audio-regeneration endpoint (`POST /synthesize`) needs
+    *some* proof the caller owns the session being replayed, without realtime learning to
+    verify the API's access/refresh tokens (CLAUDE.md §1.3 / this module's own docstring: "it
+    never mints or verifies an access/refresh token itself"). The API mints this exactly like a
+    WS token — same secret, same HS256 scheme — except **not single-use**: a report replay
+    makes many of these calls while a user scrubs back and forth, and burning the jti on first
+    use would break every call after the first. `typ: "replay"` keeps it from ever being
+    confused with (or substitutable for) an actual WS handshake token."""
+    settings = get_settings()
+    try:
+        payload = jwt.decode(token, settings.ws_token_secret, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError as exc:
+        raise AuthInvalidTokenError("Replay token invalid or expired.") from exc
+
+    if payload.get("typ") != "replay":
+        raise AuthInvalidTokenError("Wrong token type for this endpoint.")
+    session_id = payload.get("session_id")
+    if session_id is None or session_id != expected_session_id:
+        raise AuthInvalidTokenError("Replay token is not scoped to this session.")
+    return ReplayTokenClaims(session_id=session_id, user_id=payload["user_id"])

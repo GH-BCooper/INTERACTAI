@@ -71,7 +71,10 @@ docker-compose.override.yml
 
 # ── Models, weights & ML training artefacts ─────────────────────────────────
 # CLAUDE.md: never commit weights. Downloaded by docs/01-SETUP-GUIDE.md §3.
-models/
+# Anchored to the repo root (leading slash) — an unanchored `models/` also matches
+# services/api/app/models/, which is SQLAlchemy ORM code, not a weights directory, and was
+# silently untracked by this exact bug until Phase 3 (docs/PROGRESS.md).
+/models/
 wandb/
 checkpoints/
 runs/
@@ -80,7 +83,12 @@ runs/
 *.pth
 *.onnx
 *.safetensors
-data/
+# Anchored, and specifically NOT a blanket `data/` — data/boundaries/ (eval_report.json,
+# labels.jsonl, README.md) is a real Phase 1 deliverable, not a build artefact, and an
+# unanchored `data/` silently swallowed it. Only the two genuinely ephemeral subdirectories are
+# ignored: services/realtime's local WAV scratch space, and (future, Phase 5) a raw-dataset dump.
+/data/recordings/
+/data/raw/
 
 # ── Audio & media ────────────────────────────────────────────────────────
 # CLAUDE.md §1.8: never store persona audio — regenerable from transcript + voice id.

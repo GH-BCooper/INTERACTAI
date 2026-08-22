@@ -1,0 +1,58 @@
+{
+  "n_items": 220,
+  "recall": 1.0,
+  "precision": 0.5727272727272728,
+  "early_cutoffs": 94,
+  "missed_entirely": 0,
+  "latency_ms_p50": 506.80000000000007,
+  "latency_ms_p95": 596.2750000000001,
+  "by_case_type": {
+    "clean_definitive_end": {
+      "n": 60,
+      "early_cutoffs": 0,
+      "missed": 0,
+      "latency_ms_p50": 435.10000000000014,
+      "latency_ms_p95": 564.29
+    },
+    "false_start": {
+      "n": 30,
+      "early_cutoffs": 9,
+      "missed": 0,
+      "latency_ms_p50": 511.9000000000001,
+      "latency_ms_p95": 559.8999999999996
+    },
+    "list_with_pauses": {
+      "n": 40,
+      "early_cutoffs": 21,
+      "missed": 0,
+      "latency_ms_p50": 539.0,
+      "latency_ms_p95": 565.7
+    },
+    "mid_sentence_pause": {
+      "n": 50,
+      "early_cutoffs": 47,
+      "missed": 0,
+      "latency_ms_p50": 639.6999999999998,
+      "latency_ms_p95": 704.2299999999997
+    },
+    "trailing_filler_then_continues": {
+      "n": 20,
+      "early_cutoffs": 17,
+      "missed": 0,
+      "latency_ms_p50": 768.8000000000002,
+      "latency_ms_p95": 834.5000000000002
+    },
+    "trailing_filler_then_done": {
+      "n": 20,
+      "early_cutoffs": 0,
+      "missed": 0,
+      "latency_ms_p50": 485.4000000000001,
+      "latency_ms_p95": 609.8400000000005
+    }
+  },
+  "known_limitations": [
+    "Ground truth is synthetic (Piper TTS + exact silence splicing), not real hand-marked human speech \u2014 see data/boundaries/README.md.",
+    "Step 5 (semantic completeness check) is not exercised: no live MODEL_ENDPOINTER in this offline script, so NEEDS_SEMANTIC_CHECK always resolves to END here.",
+    "The adaptive threshold (step 2) never leaves its base value: every item is one independent single-utterance session, and it requires >=3 completed utterances."
+  ]
+}

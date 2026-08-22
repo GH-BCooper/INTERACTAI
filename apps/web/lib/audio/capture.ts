@@ -42,6 +42,13 @@ export function buildUpstreamWireFrame(seq: number, message: WorkletFrameMessage
 export interface MicCaptureHandlers {
   onFrame: (wireFrame: ArrayBuffer) => void;
   onMeter: (rms: number, atMs: number) => void;
+  /** Task 3.2 edge case: "Mic permission revoked mid-session -> detect via track `ended`
+   * event." The browser fires this on the MediaStreamTrack itself when the OS/browser yanks
+   * access out from under an already-running capture (Chrome's mic toggle, a revoked OS
+   * permission) — distinct from the user never granting it in the first place, and from a
+   * `devicechange` (a different device disappearing, not this one being revoked). Optional so
+   * existing callers that don't care about this signal are unaffected. */
+  onTrackEnded?: () => void;
 }
 
 export interface MicCaptureHandle {
@@ -80,6 +87,9 @@ export async function createMicCapture(handlers: MicCaptureHandlers): Promise<Mi
   };
 
   source.connect(node);
+
+  const track = stream.getAudioTracks()[0];
+  if (track) track.onended = () => handlers.onTrackEnded?.();
 
   return {
     setMuted(muted: boolean) {

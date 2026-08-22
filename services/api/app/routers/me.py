@@ -4,7 +4,7 @@ from fastapi import APIRouter, Response
 
 from ..core.deps import CurrentUser, DbSession
 from ..schemas.user import MeOut, ProfileOut, ProfileUpdate, UserOut
-from ..services import user_service
+from ..services import session_service, user_service
 
 router = APIRouter(tags=["me"])
 
@@ -12,9 +12,11 @@ router = APIRouter(tags=["me"])
 @router.get("/me", response_model=MeOut)
 async def get_me(user: CurrentUser, db: DbSession) -> MeOut:
     profile = await user_service.get_profile(db, user.id)
+    minutes = await session_service.practice_minutes_this_week(db, user.id)
     return MeOut(
         user=UserOut.model_validate(user),
         profile=ProfileOut.model_validate(profile) if profile else None,
+        practice_minutes_this_week=minutes,
     )
 
 

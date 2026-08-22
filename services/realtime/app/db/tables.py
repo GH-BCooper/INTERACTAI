@@ -48,6 +48,9 @@ sessions = Table(
     Column("ended_at", DateTime(timezone=True)),
     Column("duration_ms", Integer),
     Column("question_plan", JSONB),
+    Column("recording_key", Text),
+    Column("recording_format", Text),
+    Column("peaks", JSONB),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
 )

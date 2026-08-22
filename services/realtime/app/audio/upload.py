@@ -19,8 +19,10 @@ from __future__ import annotations
 import asyncio
 import io
 import os
+import struct
 import uuid as std_uuid
 import wave
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -36,6 +38,7 @@ logger = get_logger(__name__)
 
 WAV_HEADER_BYTES = 44
 OPUS_BITRATE = 24_000  # 24kbps, Task 2.2c
+PEAKS_BUCKETS = 1000  # docs/phase-3-BUILD.md TASK 3.3a: "~1000 buckets"
 
 
 @lru_cache
@@ -94,6 +97,36 @@ def pcm_to_wav_bytes(
         w.setframerate(sample_rate)
         w.writeframes(pcm)
     return buf.getvalue()
+
+
+def compute_peaks(pcm: bytes, *, buckets: int = PEAKS_BUCKETS) -> list[float]:
+    """Task 3.3a: a fixed-size waveform summary computed once, server-side, at finalize —
+    "decoding a 20-minute WAV in the browser to draw a waveform is a two-second freeze on first
+    render." One float per bucket: the peak (max absolute sample) in that slice of the
+    recording, normalised to [0, 1] against int16 full scale. wavesurfer.js's precomputed-peaks
+    API accepts exactly this shape.
+
+    Pure and dependency-free (no numpy — realtime's dependency set stays what Task 1.2 already
+    declared) so it's trivially unit-testable without any audio fixture at all. An empty or
+    silent recording still produces `buckets` zeros, never an empty array — the waveform still
+    renders as a flat line rather than the player having to special-case "no peaks"."""
+    sample_count = len(pcm) // 2
+    if sample_count == 0:
+        return [0.0] * buckets
+
+    samples = struct.unpack(f"<{sample_count}h", pcm[: sample_count * 2])
+    per_bucket = max(1, sample_count // buckets)
+    peaks: list[float] = []
+    for i in range(buckets):
+        start = i * per_bucket
+        if start >= sample_count:
+            peaks.append(0.0)
+            continue
+        end = sample_count if i == buckets - 1 else min(sample_count, start + per_bucket)
+        chunk = samples[start:end]
+        peak = max(abs(s) for s in chunk) if chunk else 0
+        peaks.append(round(peak / 32768.0, 4))
+    return peaks
 
 
 OPUS_ENCODE_RATE = 48_000  # libopus's native rate; anything else is resampled up to it
@@ -172,22 +205,36 @@ async def checkpoint_upload(
     return key
 
 
+@dataclass(frozen=True, slots=True)
+class RecordingResult:
+    """Task 3.3a/3.4d: what `finalize_runtime` needs to persist alongside the closed session.
+    `key`/`format` are both `None` when nothing was ever recorded (no storage configured, or the
+    session had zero seconds of user audio) — a legitimate case the report UI must render as
+    "no recording", not an error (docs/phase-3-BUILD.md TASK 3.3/3.4 edge case table)."""
+
+    key: str | None
+    format: str | None
+    peaks: list[float] | None
+
+
 async def finalize_recording(
     path: Path, *, user_id: std_uuid.UUID, session_id: std_uuid.UUID
-) -> str | None:
-    """Task 2.2c: final checkpoint, transcode to Opus, delete the WAV object and the local PCM.
-    Returns the Opus object key, or `None` if storage isn't configured. The local WAV file is
-    deleted only once the Opus upload has actually succeeded — losing the recording entirely is
-    worse than leaving a stray local file for the next process restart to find."""
+) -> RecordingResult:
+    """Task 2.2c/3.3a: final checkpoint, transcode to Opus, compute waveform peaks, delete the
+    WAV object and the local PCM. The local WAV file is deleted only once the Opus upload has
+    actually succeeded — losing the recording entirely is worse than leaving a stray local file
+    for the next process restart to find."""
     settings = get_settings()
     if not settings.s3_bucket:
-        return None
+        return RecordingResult(key=None, format=None, peaks=None)
 
     wav_key = await checkpoint_upload(path, user_id=user_id, session_id=session_id)
     pcm = await asyncio.to_thread(read_pcm_prefix, path)
     if not pcm:
-        return wav_key  # nothing was ever recorded — no turn happened; nothing to transcode
+        # Nothing was ever recorded — no turn happened; nothing to transcode or peak.
+        return RecordingResult(key=wav_key, format="wav" if wav_key else None, peaks=None)
 
+    peaks = await asyncio.to_thread(compute_peaks, pcm)
     wav_bytes = pcm_to_wav_bytes(pcm)
     try:
         opus_bytes = await asyncio.to_thread(encode_wav_to_opus_bytes, wav_bytes)
@@ -197,7 +244,8 @@ async def finalize_recording(
         )
     except Exception:
         logger.warning("recording_opus_transcode_failed", session_id=str(session_id))
-        return wav_key  # the WAV checkpoint above is still a valid, playable fallback
+        # The WAV checkpoint above is still a valid, playable fallback.
+        return RecordingResult(key=wav_key, format="wav" if wav_key else None, peaks=peaks)
 
     if wav_key is not None:
         try:
@@ -210,4 +258,4 @@ async def finalize_recording(
     except OSError:
         logger.warning("recording_local_cleanup_failed", session_id=str(session_id), path=str(path))
 
-    return opus_key
+    return RecordingResult(key=opus_key, format="opus", peaks=peaks)

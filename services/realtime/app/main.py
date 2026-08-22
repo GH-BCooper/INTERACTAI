@@ -18,18 +18,22 @@ from typing import Any
 import structlog
 from arq import create_pool
 from arq.connections import RedisSettings
-from fastapi import FastAPI, WebSocket
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 from .audio.ingest import SessionWavWriter
 from .audio.protocol import UPSTREAM_SAMPLE_RATE, FrameDecodeError, validate_upstream_frame
-from .audio.upload import checkpoint_upload, finalize_recording
+from .audio.upload import RecordingResult, checkpoint_upload, finalize_recording, pcm_to_wav_bytes
 from .coach_enqueue import ArqPoolLike, enqueue_generate_report
 from .coach_enqueue import enqueue_score_turn as _retry_score_turn
 from .core.config import get_settings
+from .core.exceptions import AuthInvalidTokenError
 from .core.logging import configure_logging, get_logger
 from .core.redis_client import get_redis_pool
+from .core.security import validate_replay_token
 from .db.repository import close_session, insert_latency_events, insert_model_call, insert_turn
 from .db.session import get_sessionmaker
 from .endpointing.cascade import is_utterance_too_short
@@ -44,9 +48,12 @@ from .schemas.ws import Pong, Ready, ServerMachineState, SessionClosed, StateCha
 from .session import SessionRegistry, SessionRuntime
 from .sink import WsTurnSink
 from .timeouts import run_state_watchdog
-from .turn import PipelineResources, UtteranceBuffer, int16_bytes_to_float32
+from .tts.piper import synthesize_chunk
+from .turn import PipelineResources, UtteranceBuffer, float32_to_int16, int16_bytes_to_float32
 
 logger = get_logger(__name__)
+
+SYNTHESIZE_TIMEOUT_S = 10.0  # generous — this is an on-demand replay call, not on the turn path
 
 PROTOCOL_MAJOR = "1"
 RECORDINGS_DIR = Path("data") / "recordings"
@@ -159,6 +166,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 app = FastAPI(title="InteractAI realtime", version="0.1.0", lifespan=lifespan)
 
+# Task 3.4d: the only cross-origin REST surface this service exposes — `POST /synthesize`,
+# called directly from the browser during report replay. The WS endpoint doesn't need this
+# (WebSocket handshakes aren't subject to CORS).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[get_settings().web_origin],
+    allow_credentials=False,
+    allow_methods=["POST"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/health")
 async def health() -> dict[str, str]:
@@ -171,6 +189,53 @@ async def health_ready() -> JSONResponse:
     if models.ready:
         return JSONResponse({"status": "ok"}, status_code=200)
     return JSONResponse({"status": "not_ready"}, status_code=503)
+
+
+class SynthesizeRequest(BaseModel):
+    token: str
+    session_id: str
+    text: str
+    voice_id: str
+
+
+@app.post("/synthesize")
+async def synthesize(body: SynthesizeRequest) -> Response:
+    """Task 3.4d: "Persona audio is regenerated on demand during replay from the transcript +
+    voice_id — it was never stored (CLAUDE.md §1.8)." Deliberately outside the WS session
+    entirely — a report can be replayed long after the session itself closed and its runtime
+    was torn down — but still gated by a token only the API service (which already verified the
+    caller owns this session) can mint (`validate_replay_token`, core/security.py). Not on any
+    latency budget: a generous flat timeout, no deadline/fallback-voice/holding-line chain
+    (Task 1.5b's cascade exists for the live turn path; a slow or failed replay synthesis just
+    surfaces as one unplayable line in the transcript, per Task 3.4's own edge-case table)."""
+    try:
+        validate_replay_token(body.token, expected_session_id=body.session_id)
+    except AuthInvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail=exc.message) from exc
+
+    models: ModelRegistry = app.state.models
+    if models.resources is None:
+        raise HTTPException(status_code=503, detail="Synthesis is not available yet.")
+
+    try:
+        result = await asyncio.wait_for(
+            synthesize_chunk(models.resources.voice_pool, body.voice_id, body.text),
+            timeout=SYNTHESIZE_TIMEOUT_S,
+        )
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Synthesis timed out.") from exc
+    except Exception as exc:
+        logger.warning("replay_synthesis_failed", voice_id=body.voice_id)
+        raise HTTPException(status_code=502, detail="Synthesis failed.") from exc
+
+    if result is None:
+        raise HTTPException(status_code=422, detail="No audio was produced for this text.")
+
+    audio, sample_rate = result
+    wav_bytes = pcm_to_wav_bytes(
+        float32_to_int16(audio).tobytes(), sample_rate=sample_rate, channels=1
+    )
+    return Response(content=wav_bytes, media_type="audio/wav")
 
 
 async def _latency_writer(rows: list[dict[str, Any]]) -> None:
@@ -230,14 +295,21 @@ async def finalize_runtime(
     await _finalize_abandoned_utterance(runtime)
     if isinstance(runtime.latency_recorder, LatencyRecorder):
         await runtime.latency_recorder.stop()
+    recording = RecordingResult(key=None, format=None, peaks=None)
     if runtime.wav_writer is not None:
         runtime.wav_writer.close()
-        await finalize_recording(
+        recording = await finalize_recording(
             runtime.wav_writer.path, user_id=runtime.user_id, session_id=runtime.session_id
         )
     async with get_sessionmaker()() as db:
         await close_session(
-            db, runtime.session_id, end_reason=end_reason, duration_ms=runtime.elapsed_ms()
+            db,
+            runtime.session_id,
+            end_reason=end_reason,
+            duration_ms=runtime.elapsed_ms(),
+            recording_key=recording.key,
+            recording_format=recording.format,
+            peaks=recording.peaks,
         )
 
     # Task 2.2d: retry any score_turn enqueues that failed mid-session, then enqueue the report

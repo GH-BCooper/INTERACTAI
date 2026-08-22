@@ -1,5 +1,7 @@
 """boto3 is sync — every call here goes through asyncio.to_thread (CLAUDE.md §4: "Blocking
-calls go through asyncio.to_thread ... never directly in the event loop").
+calls go through asyncio.to_thread ... never directly in the event loop"), except
+`presign_get_url` (Task 3.3a/3.3f): generating a presigned URL is pure local HMAC signing, no
+network call at all, so there is nothing to offload.
 """
 
 from __future__ import annotations
@@ -11,6 +13,8 @@ from typing import Any
 import boto3
 
 from .config import get_settings
+
+RECORDING_URL_TTL_SECONDS = 3600
 
 
 @lru_cache
@@ -48,3 +52,16 @@ async def delete_prefix(prefix: str) -> int:
     prefix — CLAUDE.md §1.8, audio is never stored for personas but is for user recordings.
     """
     return await asyncio.to_thread(_delete_prefix_sync, prefix)
+
+
+def presign_get_url(key: str, *, expires_in: int = RECORDING_URL_TTL_SECONDS) -> str:
+    """Task 3.3a/3.3f: the report player fetches the recording directly from S3/MinIO via this
+    URL — api mints it but never reads the object's bytes itself (CLAUDE.md §2: api never
+    touches audio)."""
+    settings = get_settings()
+    result: str = get_s3_client().generate_presigned_url(
+        "get_object",
+        Params={"Bucket": settings.s3_bucket, "Key": key},
+        ExpiresIn=expires_in,
+    )
+    return result

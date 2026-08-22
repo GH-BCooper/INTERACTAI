@@ -6,3 +6,6 @@ packages:
 # transitive dependency of tsx (used to run generate.ts) and is a widely trusted build tool.
 allowBuilds:
   esbuild: true
+  # Next.js's own optional image-optimization dependency — native binary download only,
+  # maintained by the Next.js/Vercel ecosystem.
+  sharp: true

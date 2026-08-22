@@ -183,6 +183,29 @@ async def validate_and_burn_ws_token(
     return claims
 
 
+# ── Replay token (Task 3.4d) ───────────────────────────────────────────────────
+REPLAY_TOKEN_TTL_SECONDS = 3600  # long enough to sit with one report; re-minted per page load
+
+
+def mint_replay_token(session_id: str, user_id: str) -> str:
+    """Scopes realtime's `POST /synthesize` (on-demand persona-audio regeneration for report
+    replay, CLAUDE.md §1.8) to a session this caller has already been proven to own by the
+    `CurrentUser` dependency on the route that calls this. Signed with WS_TOKEN_SECRET, same as
+    a WS handshake token, but deliberately **not** single-use (`validate_and_burn_ws_token`'s
+    Redis burn would break the second-and-later synthesis call of a single replay session) — see
+    services/realtime/app/core/security.py:validate_replay_token for the other half."""
+    settings = get_settings()
+    now = int(time.time())
+    payload = {
+        "typ": "replay",
+        "session_id": session_id,
+        "user_id": user_id,
+        "iat": now,
+        "exp": now + REPLAY_TOKEN_TTL_SECONDS,
+    }
+    return jwt.encode(payload, settings.ws_token_secret, algorithm=JWT_ALGORITHM)
+
+
 # ── OAuth CSRF state ───────────────────────────────────────────────────────────
 def _oauth_state_key(state: str) -> str:
     return f"oauth_state:{state}"

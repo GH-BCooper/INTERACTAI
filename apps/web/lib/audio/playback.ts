@@ -142,9 +142,36 @@ export class PersonaPlayback {
   private activeSources: AudioBufferSourceNode[] = [];
   private nextStartTime = 0;
   private playedChunks: PlayedChunk[] = [];
+  // Task 3.2 non-negotiable #7 ("real amplitude only... a looping fake waveform is worse than
+  // no waveform"): every scheduled source routes through this one AnalyserNode before
+  // destination, so `getAmplitude()` reflects exactly what's audibly playing right now — muting
+  // the output (disconnecting/zeroing gain downstream) does NOT affect this reading, which is
+  // deliberate: the ring should track "is the persona speaking", not "is the user's volume up".
+  private readonly analyser: AnalyserNode;
+  private readonly timeDomainBuffer: Uint8Array<ArrayBuffer>;
 
   constructor(ctx?: AudioContext) {
     this.ctx = ctx ?? new AudioContext({ sampleRate: DOWNSTREAM_SAMPLE_RATE });
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 256;
+    this.analyser.connect(this.ctx.destination);
+    this.timeDomainBuffer = new Uint8Array(this.analyser.fftSize);
+  }
+
+  /** RMS amplitude in [0, 1] of whatever is actually audible right now, sampled fresh on every
+   * call — intended to be polled from a `requestAnimationFrame` loop and written straight to a
+   * ref/CSS custom property (bypassing React state), the same discipline the mic level meter
+   * uses (docs/phase-3-LEARN.md §3: "do not put the mic level in React state"). Returns 0 when
+   * nothing is playing, never a stale or interpolated value. */
+  getAmplitude(): number {
+    if (this.activeSources.length === 0) return 0;
+    this.analyser.getByteTimeDomainData(this.timeDomainBuffer);
+    let sumSquares = 0;
+    for (let i = 0; i < this.timeDomainBuffer.length; i++) {
+      const centered = (this.timeDomainBuffer[i]! - 128) / 128;
+      sumSquares += centered * centered;
+    }
+    return Math.sqrt(sumSquares / this.timeDomainBuffer.length);
   }
 
   enqueueChunk(seq: number, payload: Int16Array, textFragment: string): void {
@@ -165,7 +192,7 @@ export class PersonaPlayback {
 
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.ctx.destination);
+    source.connect(this.analyser);
 
     const startAt = Math.max(this.ctx.currentTime + this.jitter.valueMs / 1000, this.nextStartTime);
     source.start(startAt);

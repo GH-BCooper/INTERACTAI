@@ -10,10 +10,22 @@ from ..core.config import get_settings
 from ..core.deps import CurrentUser, DbSession
 from ..core.exceptions import ForbiddenError, NotFoundError
 from ..core.redis_client import get_redis
-from ..core.security import mint_ws_token
+from ..core.security import REPLAY_TOKEN_TTL_SECONDS, mint_replay_token, mint_ws_token
 from ..models import Session as SessionModel
 from ..schemas.common import Page
-from ..schemas.session import ReportOut, SessionCreate, SessionOut, WsTokenOut
+from ..schemas.session import (
+    AnnotationCreate,
+    AnnotationOut,
+    RecordingOut,
+    ReplayTokenOut,
+    ReportOut,
+    RetryCreate,
+    SessionCreate,
+    SessionOut,
+    SessionScoreOut,
+    TurnOut,
+    WsTokenOut,
+)
 from ..services import session_service
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -36,7 +48,7 @@ async def create_session(
         resume_text_override=body.resume_text_override,
     )
     await db.commit()
-    return SessionOut.model_validate(session)
+    return session_service.session_to_out(session)
 
 
 @router.get("", response_model=Page[SessionOut])
@@ -48,7 +60,7 @@ async def list_sessions(
 ) -> Page[SessionOut]:
     sessions, total = await session_service.list_sessions(db, user.id, limit=limit, offset=offset)
     return Page(
-        items=[SessionOut.model_validate(s) for s in sessions],
+        items=[session_service.session_to_out(s) for s in sessions],
         total=total,
         limit=limit,
         offset=offset,
@@ -67,7 +79,7 @@ async def _get_owned_or_raise(db: DbSession, user: CurrentUser, session_id: UUID
 @router.get("/{session_id}", response_model=SessionOut)
 async def get_session(session_id: UUID, user: CurrentUser, db: DbSession) -> SessionOut:
     session = await _get_owned_or_raise(db, user, session_id)
-    return SessionOut.model_validate(session)
+    return session_service.session_to_out(session)
 
 
 @router.post("/{session_id}/ws-token", response_model=WsTokenOut)
@@ -87,10 +99,65 @@ async def mint_session_ws_token(
     )
 
 
+@router.post("/{session_id}/replay-token", response_model=ReplayTokenOut)
+async def mint_session_replay_token(
+    session_id: UUID, user: CurrentUser, db: DbSession
+) -> ReplayTokenOut:
+    """Task 3.4d: scopes the browser's direct calls to realtime's `POST /synthesize` for
+    on-demand persona-audio regeneration during report replay. Ownership is checked here, once —
+    the token itself is what proves that to realtime afterwards, so realtime never needs to
+    query api's `sessions` table."""
+    session = await _get_owned_or_raise(db, user, session_id)
+    token = mint_replay_token(str(session.id), str(user.id))
+    return ReplayTokenOut(token=token, expires_in=REPLAY_TOKEN_TTL_SECONDS)
+
+
 @router.get("/{session_id}/report", response_model=ReportOut)
 async def get_session_report(session_id: UUID, user: CurrentUser, db: DbSession) -> ReportOut:
     await _get_owned_or_raise(db, user, session_id)
     report = await session_service.get_report(db, session_id)
     if report is None:
         raise NotFoundError("The report has not been generated yet.")
-    return ReportOut.model_validate(report)
+    return session_service.report_to_out(report)
+
+
+@router.get("/{session_id}/turns", response_model=list[TurnOut])
+async def get_session_turns(session_id: UUID, user: CurrentUser, db: DbSession) -> list[TurnOut]:
+    await _get_owned_or_raise(db, user, session_id)
+    return await session_service.list_turns_with_scores(db, session_id)
+
+
+@router.get("/{session_id}/scores", response_model=list[SessionScoreOut])
+async def get_session_scores(
+    session_id: UUID, user: CurrentUser, db: DbSession
+) -> list[SessionScoreOut]:
+    session = await _get_owned_or_raise(db, user, session_id)
+    return await session_service.list_session_scores(db, session)
+
+
+@router.get("/{session_id}/recording", response_model=RecordingOut)
+async def get_session_recording(session_id: UUID, user: CurrentUser, db: DbSession) -> RecordingOut:
+    session = await _get_owned_or_raise(db, user, session_id)
+    return session_service.get_recording(session)
+
+
+@router.post("/{session_id}/annotations", response_model=AnnotationOut, status_code=201)
+async def create_session_annotation(
+    session_id: UUID, body: AnnotationCreate, user: CurrentUser, db: DbSession
+) -> AnnotationOut:
+    session = await _get_owned_or_raise(db, user, session_id)
+    annotation = await session_service.create_annotation(db, session, user, body)
+    await db.commit()
+    return AnnotationOut.model_validate(annotation)
+
+
+@router.post("/{session_id}/retry", response_model=SessionOut, status_code=201)
+async def retry_session_question(
+    session_id: UUID, body: RetryCreate, user: CurrentUser, db: DbSession, redis: RedisDep
+) -> SessionOut:
+    """Task 3.4f — "retry one question": a short new session seeded with exactly one question
+    from this one, linked back for comparison."""
+    session = await _get_owned_or_raise(db, user, session_id)
+    retry = await session_service.create_retry_session(db, redis, user, session, body.turn_id)
+    await db.commit()
+    return session_service.session_to_out(retry)

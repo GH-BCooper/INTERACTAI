@@ -510,3 +510,241 @@ Three more decision docs, continuing the numbering:
   `pytest tests/safety` command run locally, which passed 36/36). Ollama install/serve/pull
   inside the CI runner and the `GROQ_API_KEY` secret being configured are both unverified from
   here — no push/CI access in this environment.
+
+## 2026-08-23 — Phase 0/1/2 re-verification (before starting Phase 3)
+
+Per this session's own instruction to confirm Phases 0-2 before building Phase 3: re-ran
+`make lint` (clean, all four checks — ruff, `mypy --strict` on realtime, mypy on api and coach,
+eslint/tsc on web) and the full test suite from a cold state.
+
+- **513/514 backend tests passed.** The one failure,
+  `test_initial_prompt_biasing_recognizes_uncommon_term` (Task 1.4's vocabulary-biasing
+  acceptance test), is a live faster-whisper call whose biased transcription came back
+  "Spotbies" this run instead of the "Spotmies" the test asserts — closer than the *unbiased*
+  "Sputbys" Phase 1 originally recorded, but not an exact match. This is real model
+  non-determinism on a single hand-picked example, not a regression from anything touched this
+  session (no ASR/VAD/persona code was changed in Phase 3). Flagged, not silently reasserted to
+  a looser check.
+- **30/30 web (vitest) tests passed** — `pnpm --filter @interactai/web run test` had been
+  skipped by the pytest failure above in the combined `make test` run (Make aborts a recipe's
+  remaining lines on a non-zero exit), so it was run directly.
+- No other regressions found. Phases 0-2 are confirmed complete and unchanged; Phase 3 below is
+  built on top of them.
+
+## 2026-08-23 — Phase 3: The practice room and the report
+
+Built all of `docs/phase-3-BUILD.md` in one session (its own "one task per session" rule
+explicitly waived per instruction), on top of the confirmed Phase 0-2 foundation. This phase
+touches every layer: new backend endpoints the report/replay surface needs but Phase 0-2 never
+built, a from-scratch Next.js App Router frontend (`apps/web` had no `app/` directory at all
+before this session — just the Phase 0-1 generated-schema tests and audio/protocol logic), and a
+live end-to-end verification pass against the real running stack.
+
+### What exists now
+
+**Backend additions** (Task 3.3/3.4 needed real new surface, not just UI):
+
+- **Recording metadata + waveform peaks** (`docs/decisions/0012`): `sessions.recording_key` /
+  `.recording_format` / `.peaks`, written once by `services/realtime`'s `finalize_recording`
+  (which already holds the decoded PCM in memory before Opus-encoding it — computing peaks
+  there is free) and read by `services/api`'s new `GET /sessions/{id}/recording`, which mints a
+  presigned S3/MinIO URL without ever touching the audio bytes itself (CLAUDE.md §2).
+- **`GET /sessions/{id}/turns`** — every turn with its `turn_metrics` and `turn_scores` joined in
+  Python (no FK exists between them and partitioned `turns`, docs/decisions/0002), gated scores
+  (`score: null`) passed through exactly as stored, never re-derived.
+- **`GET /sessions/{id}/scores`** — the session-level rollup, each row carrying the rubric's own
+  anchor text joined in from `content_service`, plus a synthetic "Delivery" row for the
+  deterministic criterion (name/anchors hardcoded once, `session_service.py`, since `delivery`
+  isn't a real `rubric_criteria` row).
+- **`POST /sessions/{id}/annotations`** (Task 3.4e/CS-15) — round auto-increments server-side per
+  `(turn_id, annotator_id, criterion_key)`, so the uniqueness constraint can never be violated by
+  a client that doesn't track its own round state (docs/decisions/0016). The model's own
+  prediction is never in scope inside this endpoint or the frontend control that calls it.
+- **`POST /sessions/{id}/retry`** (Task 3.4f) — copies the original session's entire frozen
+  `brief`, overriding only `opening_strategy` (the persona turn immediately preceding the
+  retried answer — `index < target_turn.index`, mirroring
+  `services/coach/app/report/build.py::_find_preceding_question`) and `target_minutes` (fixed at
+  5). No changes to `services/realtime`'s persona pipeline were needed — the retry session is an
+  ordinary session whose scripted opener happens to ask a specific question
+  (docs/decisions/0016).
+- **`POST /sessions/{id}/replay-token` + realtime's `POST /synthesize`** (Task 3.4d,
+  docs/decisions/0014) — on-demand persona-audio regeneration for report replay. A new,
+  deliberately non-single-use token type (`typ: "replay"`, same `WS_TOKEN_SECRET`, 1-hour TTL)
+  since the WS handshake token's single-use Redis burn would break the second play-this-line
+  click of a replay session. Lives on `services/realtime`, never `services/api` (CLAUDE.md §2:
+  api never touches audio; realtime already owns Piper and every warmed voice).
+- **The OAuth callback fix** (docs/decisions/0013) — `GET /auth/{provider}/callback` now
+  redirects to `{WEB_ORIGIN}/auth/callback#token=...&expires_in=...` instead of returning JSON
+  directly. The original Phase 0 handler could not have worked with any browser-based frontend:
+  the provider's own redirect lands the browser here as a top-level navigation, and a JSON
+  response would just strand the user on a bare API page with no route back into the app. Found
+  and fixed while building the actual sign-in button, not before — Phase 0's own acceptance
+  criteria explicitly scoped the live OAuth round trip out as needing "a human + a real browser."
+- **`GET /me` now returns `practice_minutes_this_week`** (Task 3.1's sidebar meter) — calendar
+  week starting Monday 00:00 UTC, summed from real `sessions.duration_ms`.
+- A new migration (`c3d4e5f6a7b8`) for all of the above; `services/realtime/app/db/tables.py`'s
+  Core mirror of `sessions` updated to match (docs/decisions/0002's pattern).
+
+**Frontend** (`apps/web`, built from nothing — Next.js 15 / React 19 / Tailwind v4 / Zustand /
+TanStack Query / wavesurfer.js / cmdk, added to what was previously a schema-tests-only
+workspace):
+
+- **Design tokens** (Task 3.1): dark-first with a genuine light mode
+  (`app/globals.css` — three colour-token blocks, not an inversion filter), exactly six font
+  sizes and two weights enforced by resetting Tailwind v4's `--font-size-*`/`--font-weight-*`
+  namespaces and redefining only those, and a real CI-style check
+  (`apps/web/scripts/check-design-tokens.mjs`, chained into `pnpm run lint`) that greps for raw
+  hex colours in any component and confirms the four reserved score-colour tokens are referenced
+  nowhere outside `components/score/` — the one directory that consumes them, via
+  `components/score/score-color.ts` rather than any other file spelling out the token names
+  directly.
+- **App shell** (Task 3.1): collapsible sidebar with the practice-minutes meter, top bar with
+  breadcrumb + "Start practice" + user menu, a `cmdk`-based command palette (⌘K) with real
+  scenario/session search and the three specified verbs, a toast region. Applied to every
+  authenticated route except the practice room via a `(shell)` route group; the practice room
+  sits in a sibling `(bare)` group with no shared layout at all.
+- **The practice room** (Task 3.2, `components/practice/practice-room.tsx`) — the one client
+  boundary on its route, exactly as specified. `lib/realtime/connection.ts` (a framework-free WS
+  state machine, testable by injecting a fake socket — 9 unit tests covering hello-vs-resume,
+  session_busy detection distinct from token-reuse despite sharing close code 4409, exponential
+  reconnect backoff, and clean-vs-abnormal close handling) drives `stores/practice-store.ts`.
+  `lib/realtime/audio-text-correlator.ts` solves a real protocol subtlety: the wire format sends
+  a chunk's audio-meta, binary frame and text as three separate messages with no shared id,
+  correlated only by send order (5 unit tests). The mic level meter and the speaking ring's
+  amplitude both bypass React state entirely, writing straight to a CSS custom property from a
+  worklet callback / `requestAnimationFrame` loop respectively (`lib/audio/playback.ts` gained a
+  real `AnalyserNode` for this — previously unused since Phase 1 built no consumer for it).
+  `useAudioCapture` (`hooks/use-audio-capture.ts`) handles all three device edge cases: denial
+  (browser-specific recovery instructions, `lib/browser-detect.ts`), mid-session revocation (a
+  new `onTrackEnded` hook added to `lib/audio/capture.ts`'s `createMicCapture`, since it didn't
+  expose the raw track before), and `devicechange` re-acquisition. The pre-flight check (AU-09)
+  reuses the real pipeline rather than a synthetic mode that doesn't exist server-side
+  (docs/decisions/0017) — the scripted opening line already playing is the speaker proof, the
+  user's first live partial transcript is the capture/ASR proof.
+- **The report** (Tasks 3.3/3.4, `components/report/*`) — server-computed peaks feed wavesurfer.js
+  directly (no client-side audio decode), turn-boundary regions and highlight/lowlight markers
+  sync independently of the waveform's own create/destroy lifecycle (a real bug caught and fixed
+  during this session: regions were originally baked in at instance-creation time, so a `turns`
+  query resolving *after* the `recording` query would silently ship a waveform with no regions at
+  all forever — see `hooks/use-report-waveform.ts`'s two-effect split). One `playheadMs` in
+  `stores/player-store.ts` drives the transcript's auto-scroll, the score panel's active
+  criterion, and the verdict block's evidence links — `lib/report/derive-current-turn.ts`,
+  `lib/report/build-transcript-segments.ts` and `lib/report/map-char-offset-to-ms.ts` are the
+  pure, unit-tested derivations underneath (evidence-span-to-seek-time in particular walks
+  `word_timings` to locate each word's real position in `turns.text`, correctly resolving
+  repeated words to their actual occurrence — 6 unit tests). The annotation control never
+  receives the model's prediction as a prop at all, not just visually hidden. Retry-one-question
+  is a button on every user turn. Deep-linking (`?turn=&t=&criterion=`) restores once on mount
+  and re-syncs on a 300ms debounce thereafter. wavesurfer's `<canvas>` rendering can't resolve
+  CSS `var()`, so every waveform colour is resolved to a concrete value via
+  `lib/theme/resolve-css-var.ts` before being handed to it — region colours, being real DOM
+  elements underneath, don't have this problem, verified by reading wavesurfer's own regions
+  plugin source rather than assumed.
+- **Auth** (docs/decisions/0015): access token in memory only (never `localStorage`), the
+  existing Phase 0 httpOnly refresh cookie exchanged via `POST /auth/refresh` on boot and once
+  on any 401. `/app/*` pages are thin Server Components; all authenticated data fetching happens
+  client-side via TanStack Query — a deliberate, recorded deviation from the phase doc's literal
+  "Server Component fetches session/scenario/persona" sketch, since the practice room needs
+  browser-only APIs regardless and this architecture has no SSR-readable access token to give a
+  Server Component in the first place.
+
+### Real bugs this session's own live testing found
+
+1. **The OAuth callback couldn't work at all** (see above) — not a live-run discovery in the
+   usual sense (no OAuth app credentials with a real callback were exercised here either), but
+   found the moment the sign-in button's actual flow was traced end-to-end while building it.
+2. **The waveform region-sync bug** (see above) — caught by re-reading the hook's own dependency
+   array against the real shape of three independent, differently-timed TanStack Query fetches,
+   not by a failing test (there was no test for this interaction). Fixed before it shipped.
+3. **Two duplicate `uvicorn` processes were already bound to ports 8000/8080** when live
+   verification started this session — leftover from an earlier session's live-testing (process
+   creation timestamps ~5 hours before this session started, command lines matching an older
+   invocation style), serving stale pre-Phase-3 code. `GET /me` silently missing the new
+   `practice_minutes_this_week` field and the new `/turns`/`/scores`/`/recording`/`/replay-token`
+   routes all 404ing were the tell; `netstat` + process command-line inspection confirmed which
+   PID was which before stopping the stale ones. A reminder that this environment's background
+   processes persist across sessions and aren't reset automatically.
+4. **A dangling, unreachable git commit** (`0a667c0`, message "version012") was found in the
+   repository's object database — not on any branch, not part of `git log`, but a genuine, very
+   recent (same-day) full snapshot of the repo close to its current state. It was used once,
+   surgically, to recover the original `services/api/app/core/s3.py` after this session
+   accidentally clobbered it with `Write` instead of reading-then-editing (a real process error,
+   caught immediately via `mypy` failing on a now-missing `delete_prefix` import that
+   `services/api/app/services/user_service.py` depends on for account deletion). Worth knowing
+   this commit exists — it may be an automatic checkpoint from tooling outside this
+   conversation's control, not something this session created.
+
+### What was verified by actually running it
+
+- **The full backend build**: `make lint` (ruff, `mypy --strict` on realtime, mypy on api and
+  coach, eslint/tsc/design-token-check on web) clean; `tests/integration/` (34 tests, real
+  Postgres/Redis via testcontainers, including a new 13-test file exercising every new endpoint
+  above) all passing; the realtime session-lifecycle unit test files (145 tests) unaffected by
+  the `close_session`/`finalize_recording` signature changes.
+- **The full frontend build**: `pnpm run typecheck`/`lint`/`test` clean (84 vitest tests across
+  14 files); a real `next build` production build succeeds, including the dynamic
+  `/app/practice/[sessionId]` and `/app/sessions/[id]` routes.
+- **A live, multi-service smoke test against the real stack** (`make up`'s Postgres/Redis/MinIO,
+  real `uvicorn` processes for api and realtime, migrations + `make seed` applied): created a
+  real user, minted a real access token, created a real session, and called every new endpoint
+  live — `GET /me` (confirmed the new field), `GET /sessions/{id}/recording` (confirmed the
+  correct all-null shape for a session with no recording), `GET /sessions/{id}/turns` and
+  `/scores` (confirmed empty-array shape), `POST /sessions/{id}/replay-token`, and
+  `POST /sessions/{id}/ws-token`. Most notably, **`POST /synthesize` was called for real** with a
+  real replay token against the real running realtime process: it returned a genuine, valid WAV
+  (mono, 24kHz, 3.36s, verified by actually parsing the file with Python's `wave` module) for a
+  sentence of text, with the correct `Access-Control-Allow-Origin: http://localhost:3000` header
+  present — the entire Task 3.4d pipeline (mint token -> validate token -> real Piper synthesis
+  -> CORS-correct response) confirmed end-to-end, not just unit-tested. `next start` was also run
+  and its `/`, `/auth/callback` and `/app` routes confirmed to return real, correctly-hydrated
+  HTML (including the `next/font` Inter/JetBrains Mono variable classes) via `curl`. Test data
+  and the extra background processes were cleaned up afterward.
+
+### What I could not verify by running it
+
+- **Any real browser interaction at all.** No browser, display, microphone, or speakers exist in
+  this environment. Every piece of DOM/Web-Audio-dependent logic that *can* be unit-tested
+  without a browser (worklet meter math, the WS state machine, the audio/text correlator, the
+  transcript segment builder, the char-offset-to-ms mapper, the player/practice Zustand stores)
+  has real tests and they pass; the pieces that fundamentally cannot be — `getUserMedia` actually
+  prompting and streaming, the `AudioWorkletNode` capture pipeline as a whole, wavesurfer.js
+  actually painting a canvas and responding to a real click/drag, the command palette's and
+  dialogs' real keyboard focus behavior, any visual/dark-vs-light rendering check — are
+  code-reviewed and built to spec but not run in a browser this session. Same category of gap
+  Phase 1 recorded for the AudioWorklet and Phase 2 recorded for the browser side of the practice
+  room's precursors.
+- **A full 10-minute live practice-room session** (Task 3.2's own acceptance criterion), a real
+  Wi-Fi-drop-and-reconnect, and a real screen-reader pass over the ARIA live regions — all built
+  to the spec's exact wording (`state_change.client_state` mapped directly, never re-derived;
+  `role="status" aria-live="polite"` on the turn indicator; reduced-motion checked via
+  `matchMedia` before any `requestAnimationFrame` loop starts) but not run live.
+- **The 60-turn transcript's actual frame rate.** `content-visibility: auto` was chosen
+  deliberately over a windowing library (docs/decisions/0017) but never measured against a real
+  60-turn session in a real browser.
+- **`GET /sessions/{id}/report`'s progressive-rendering polling against a real coach run** —
+  `useSessionReport`'s `refetchInterval` logic was code-reviewed, not run against an actual
+  `generate_report` job completing while the report page was open (that path is Phase 2's own
+  already-tested `services/coach` pipeline; connecting it live to *this* page's polling wasn't
+  exercised this session).
+- **CI** — no push/CI access in this environment, same standing gap as every previous phase.
+
+### Follow-up quick-verification pass (same day)
+
+Requested as a second pass to confirm everything above and finish anything left incomplete.
+Nothing was left incomplete; one further latent bug surfaced and was fixed:
+
+- **The `.gitignore` fix above had an immediate, visible consequence**: `ruff check .` discovers
+  files by walking the tree and skipping gitignored paths by default — so `services/api/app/
+  models/*.py` had never actually been linted by `make lint` before, the whole time it was
+  invisible to git. The instant it became visible, `ruff` surfaced five real (if minor)
+  pre-existing style violations there — four over-length lines and one redundant quoted forward
+  reference — from as far back as Phase 0. All five fixed; `make lint` is clean again, now
+  genuinely covering every file it always should have. (`mypy` was unaffected either way — it's
+  invoked with an explicit path, not gitignore-aware directory discovery, so it was already
+  checking these files every time.)
+- Re-ran the full non-safety backend suite from a warm environment: **532 passed, 0 failed**
+  (up from 513/514 — the 18 new tests from this session's own additions), including the
+  previously-flaky whisper vocabulary-biasing test passing clean this time. Full `make lint`,
+  all 34 integration tests, all 84 frontend tests, and a fresh `next build` all re-confirmed
+  green. `git add --dry-run services/api/app/models/` confirmed only the ten real `.py` files
+  stage — no `__pycache__` leakage through the newly-un-ignored path.

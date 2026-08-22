@@ -1,0 +1,233 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — docs/phase-3-BUILD.md TASK 3.1 / docs/10-frontend-shell.md.
+ *
+ * Dark-first, with a genuinely designed (not inverted) light mode. Score colours are declared
+ * once here and MUST NOT be referenced anywhere outside a rubric-value context — see
+ * scripts/check-design-tokens.mjs, which greps for exactly that.
+ */
+
+@theme {
+  /* Exactly six type sizes (12/13/15/17/22/32px) — no others exist as utilities. */
+  --font-size-*: initial;
+  --font-size-xs: 0.75rem; /* 12px — metadata, timestamps */
+  --font-size-sm: 0.8125rem; /* 13px — secondary text, labels */
+  --font-size-base: 0.9375rem; /* 15px — body */
+  --font-size-md: 1.0625rem; /* 17px — emphasized body, section titles */
+  --font-size-lg: 1.375rem; /* 22px — page titles */
+  --font-size-xl: 2rem; /* 32px — hero numbers (overall score, timers) */
+
+  --font-size-xs--line-height: 1.4;
+  --font-size-sm--line-height: 1.5;
+  --font-size-base--line-height: 1.6;
+  --font-size-md--line-height: 1.5;
+  --font-size-lg--line-height: 1.35;
+  --font-size-xl--line-height: 1.15;
+
+  /* Two weights only. */
+  --font-weight-*: initial;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+
+  --font-family-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-family-mono: var(--font-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  --color-accent: var(--accent);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-danger: var(--danger);
+  --color-score-strong: var(--score-strong);
+  --color-score-developing: var(--score-developing);
+  --color-score-weak: var(--score-weak);
+  --color-score-insufficient: var(--score-insufficient);
+
+  --animate-pulse-gentle: pulse-gentle 2.4s ease-in-out infinite;
+  --animate-thinking: thinking-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse-gentle {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+@keyframes thinking-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ── Colour tokens ─────────────────────────────────────────────────────────────────────────
+   Base (:root, no attribute) is the dark palette — this product is dark-first. Light is a
+   genuine second design, applied via `@media (prefers-color-scheme: light)` for users who
+   haven't chosen explicitly, and via `[data-theme="light"]` / `[data-theme="dark"]` once they
+   have (the explicit choice always wins, in both directions). */
+:root {
+  --bg-page: #0b0d10;
+  --bg-card: #14171b;
+  --bg-raised: #1c2025;
+  --border-subtle: #23272d;
+  --border: #2a2f36;
+
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa1ab;
+  --text-tertiary: #6b7280;
+  --text-on-accent: #ffffff;
+
+  --accent: #5b8cff;
+  --accent-hover: #7ba0ff;
+  --accent-contrast: #ffffff;
+
+  /* RESERVED — rubric values only. Never used for status, errors, links, or decoration. */
+  --score-strong: #34c77b;
+  --score-developing: #e2a33d;
+  --score-weak: #f0576a;
+  --score-insufficient: #6b7280;
+
+  /* A deliberately distinct red from --score-weak — destructive actions (delete recording, end
+     session) are never a rubric judgement, so they never borrow the reserved palette. */
+  --danger: #c9564e;
+  --danger-hover: #d9695f;
+
+  --focus-ring: #7ba0ff;
+
+  --motion-fast: 150ms;
+  --motion-panel: 400ms;
+  --motion-ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg-page: #f6f7f9;
+    --bg-card: #ffffff;
+    --bg-raised: #ffffff;
+    --border-subtle: #edeef1;
+    --border: #e1e4e8;
+
+    --text-primary: #14171b;
+    --text-secondary: #4b5563;
+    --text-tertiary: #6b7280;
+    --text-on-accent: #ffffff;
+
+    --accent: #3363e0;
+    --accent-hover: #2850c2;
+    --accent-contrast: #ffffff;
+
+    --score-strong: #16874f;
+    --score-developing: #a6690f;
+    --score-weak: #c62e46;
+    --score-insufficient: #6b7280;
+
+    --danger: #b0362f;
+    --danger-hover: #98241e;
+
+    --focus-ring: #3363e0;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg-page: #f6f7f9;
+  --bg-card: #ffffff;
+  --bg-raised: #ffffff;
+  --border-subtle: #edeef1;
+  --border: #e1e4e8;
+
+  --text-primary: #14171b;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --text-on-accent: #ffffff;
+
+  --accent: #3363e0;
+  --accent-hover: #2850c2;
+  --accent-contrast: #ffffff;
+
+  --score-strong: #16874f;
+  --score-developing: #a6690f;
+  --score-weak: #c62e46;
+  --score-insufficient: #6b7280;
+
+  --danger: #b0362f;
+  --danger-hover: #98241e;
+
+  --focus-ring: #3363e0;
+}
+
+:root[data-theme="dark"] {
+  --bg-page: #0b0d10;
+  --bg-card: #14171b;
+  --bg-raised: #1c2025;
+  --border-subtle: #23272d;
+  --border: #2a2f36;
+
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa1ab;
+  --text-tertiary: #6b7280;
+  --text-on-accent: #ffffff;
+
+  --accent: #5b8cff;
+  --accent-hover: #7ba0ff;
+  --accent-contrast: #ffffff;
+
+  --score-strong: #34c77b;
+  --score-developing: #e2a33d;
+  --score-weak: #f0576a;
+  --score-insufficient: #6b7280;
+
+  --danger: #c9564e;
+  --danger-hover: #d9695f;
+
+  --focus-ring: #7ba0ff;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible focus rings everywhere — never removed (docs/phase-3-BUILD.md accessibility). */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Motion: state changes < 200ms, panels 400ms. The speaking indicator and replay playhead are
+   the only continuous animations, and both are already opted out below under reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* wavesurfer.js renders into a plain div — this keeps its cursor/regions on-theme without
+   fighting the library's own inline styles. */
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}

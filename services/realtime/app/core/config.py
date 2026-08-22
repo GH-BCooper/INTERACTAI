@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     database_url: str
     redis_url: str
 
+    # Task 3.4d: the browser calls `POST /synthesize` directly (report replay, not a live
+    # session) — realtime needs CORS for exactly that one cross-origin REST route, same origin
+    # api already trusts.
+    web_origin: str = "http://localhost:3000"
+
     max_concurrent_sessions: int = 4
 
     # ── Recording storage (Task 1.1/1.2c: "upload the recording") ───────────────

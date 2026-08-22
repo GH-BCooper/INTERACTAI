@@ -30,22 +30,31 @@ async def close_session(
     *,
     end_reason: str,
     duration_ms: int,
+    recording_key: str | None = None,
+    recording_format: str | None = None,
+    peaks: list[float] | None = None,
 ) -> None:
-    """Task 1.1: "mark the session `closed` with `end_reason`". Without this, a finalised
+    """Task 1.1/3.3a: "mark the session `closed` with `end_reason`", plus (new in Phase 3) the
+    recording/peaks metadata the report player needs. Without the status update, a finalised
     runtime's session row stays `status="created"` forever, which silently eats one slot of
-    every future `max_concurrent_sessions` check for that user."""
+    every future `max_concurrent_sessions` check for that user. The recording fields are only
+    ever set here, once, at the same moment the session is marked closed — nothing else in this
+    codebase writes them."""
     now = datetime.now(UTC)
-    await db.execute(
-        update(sessions)
-        .where(sessions.c.id == session_id)
-        .values(
-            status="closed",
-            end_reason=end_reason,
-            ended_at=now,
-            duration_ms=duration_ms,
-            updated_at=now,
-        )
-    )
+    values: dict[str, Any] = {
+        "status": "closed",
+        "end_reason": end_reason,
+        "ended_at": now,
+        "duration_ms": duration_ms,
+        "updated_at": now,
+    }
+    if recording_key is not None:
+        values["recording_key"] = recording_key
+    if recording_format is not None:
+        values["recording_format"] = recording_format
+    if peaks is not None:
+        values["peaks"] = peaks
+    await db.execute(update(sessions).where(sessions.c.id == session_id).values(**values))
     await db.commit()
 
 

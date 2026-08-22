@@ -28,6 +28,8 @@ class ProfileOut(BaseModel):
 class MeOut(BaseModel):
     user: UserOut
     profile: ProfileOut | None
+    # docs/phase-3-BUILD.md TASK 3.1: the sidebar's "practice-minutes-this-week meter".
+    practice_minutes_this_week: int
 
 
 class ProfileUpdate(BaseModel):

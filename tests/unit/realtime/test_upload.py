@@ -16,7 +16,9 @@ import numpy as np
 import pytest
 
 from services.realtime.app.audio.upload import (
+    PEAKS_BUCKETS,
     checkpoint_upload,
+    compute_peaks,
     encode_wav_to_opus_bytes,
     finalize_recording,
     get_s3_client,
@@ -109,6 +111,36 @@ class TestPureTranscoding:
         assert duration_s == pytest.approx(3.0, abs=0.05)
 
 
+class TestComputePeaks:
+    """Task 3.3a: the waveform summary — pure, no S3, no filesystem."""
+
+    def test_returns_exactly_buckets_floats_in_range(self) -> None:
+        peaks = compute_peaks(_tone_pcm(5.0))
+        assert len(peaks) == PEAKS_BUCKETS
+        assert all(0.0 <= p <= 1.0 for p in peaks)
+
+    def test_silence_is_all_zero(self) -> None:
+        silence = b"\x00\x00" * 16_000  # 1s of digital silence at 16kHz
+        peaks = compute_peaks(silence)
+        assert peaks == [0.0] * PEAKS_BUCKETS
+
+    def test_full_scale_tone_has_peaks_near_one(self) -> None:
+        t = np.linspace(0, 1.0, 16_000, endpoint=False)
+        full_scale = (np.sin(2 * np.pi * 220 * t) * 32767).astype(np.int16).tobytes()
+        peaks = compute_peaks(full_scale)
+        assert max(peaks) > 0.95
+
+    def test_empty_pcm_returns_all_zero_not_empty_list(self) -> None:
+        assert compute_peaks(b"") == [0.0] * PEAKS_BUCKETS
+
+    def test_shorter_than_buckets_recording_pads_remaining_buckets_with_zero(self) -> None:
+        # 10 samples can't fill 1000 buckets one-for-one; the tail must be zero, not truncated.
+        tiny = (np.full(10, 32767, dtype=np.int16)).tobytes()
+        peaks = compute_peaks(tiny)
+        assert len(peaks) == PEAKS_BUCKETS
+        assert peaks[-1] == 0.0
+
+
 pytestmark_minio = pytest.mark.skipif(not _minio_reachable(), reason="MinIO not reachable")
 
 
@@ -161,8 +193,11 @@ class TestCheckpointAndFinalize:
         original_wav_size = wav_path.stat().st_size
 
         user_id, session_id = uuid.uuid4(), uuid.uuid4()
-        opus_key = await finalize_recording(wav_path, user_id=user_id, session_id=session_id)
+        result = await finalize_recording(wav_path, user_id=user_id, session_id=session_id)
+        opus_key = result.key
         assert opus_key == recording_key_opus(user_id, session_id)
+        assert result.format == "opus"
+        assert result.peaks is not None and len(result.peaks) == PEAKS_BUCKETS
 
         settings = get_settings()
         client = _s3_client()
@@ -192,11 +227,13 @@ class TestCheckpointAndFinalize:
         wav_path = tmp_path / "empty.wav"
         wav_path.write_bytes(pcm_to_wav_bytes(b""))
         result = await finalize_recording(wav_path, user_id=uuid.uuid4(), session_id=uuid.uuid4())
-        assert result is None
+        assert result.key is None
+        assert result.format is None
+        assert result.peaks is None
 
 
 @pytest.mark.asyncio
-async def test_finalize_recording_returns_none_when_storage_not_configured(
+async def test_finalize_recording_returns_none_fields_when_storage_not_configured(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """`get_settings()` is `@lru_cache`d to one singleton per process — mutating that instance's
@@ -208,5 +245,7 @@ async def test_finalize_recording_returns_none_when_storage_not_configured(
 
     monkeypatch.setattr(get_settings(), "s3_bucket", "")
     result = await finalize_recording(wav_path, user_id=uuid.uuid4(), session_id=uuid.uuid4())
-    assert result is None
+    assert result.key is None
+    assert result.format is None
+    assert result.peaks is None
     assert wav_path.exists()  # never touched — nothing was ever uploaded to delete it after
