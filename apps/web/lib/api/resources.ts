@@ -1,25 +1,71 @@
 import { apiFetch } from "./client";
 import type {
   AnnotationOut,
+  DashboardOut,
   Difficulty,
   MeOut,
+  ModelsSettingsOut,
   Page,
   PersonaOut,
+  PrivacySettingsOut,
+  ProgressOut,
+  ProviderConnectionTestOut,
+  ProviderCredentialOut,
+  ProviderName,
   RecordingOut,
   ReplayTokenOut,
   ReportOut,
   RubricOut,
   ScenarioOut,
+  ScenarioProgressOut,
   SessionOut,
   SessionScoreOut,
   TurnOut,
+  UserDataExport,
+  UserOut,
+  VoicePreviewTokenOut,
   WsTokenOut,
 } from "./types";
 
+export interface ProfileUpdateBody {
+  resume_text?: string | null;
+  target_role?: string | null;
+  clear_resume?: boolean;
+  goal?: string | null;
+  experience_level?: string | null;
+  focus_areas?: string[];
+  captions_default?: boolean;
+  speaking_rate?: number;
+  noise_suppression?: boolean;
+  echo_cancellation?: boolean;
+}
+
 export const me = {
   get: () => apiFetch<MeOut>("/me"),
-  updateProfile: (body: { resume_text?: string | null; target_role?: string | null; clear_resume?: boolean }) =>
+  updateProfile: (body: ProfileUpdateBody) =>
     apiFetch<MeOut["profile"]>("/me/profile", { method: "PATCH", body }),
+  completeOnboarding: () => apiFetch<UserOut>("/me/onboarding/complete", { method: "POST" }),
+  getPrivacy: () => apiFetch<PrivacySettingsOut>("/me/privacy"),
+  updatePrivacy: (body: { training_consent?: boolean; audio_retention_days?: number }) =>
+    apiFetch<PrivacySettingsOut>("/me/privacy", { method: "PATCH", body }),
+  getModels: () => apiFetch<ModelsSettingsOut>("/me/models"),
+  updateModels: (body: { prefer_local_models?: boolean }) =>
+    apiFetch<ModelsSettingsOut>("/me/models", { method: "PATCH", body }),
+  listProviders: () => apiFetch<ProviderCredentialOut[]>("/me/providers"),
+  saveProvider: (provider: ProviderName, apiKey: string) =>
+    apiFetch<ProviderCredentialOut>(`/me/providers/${provider}`, {
+      method: "PUT",
+      body: { api_key: apiKey },
+    }),
+  deleteProvider: (provider: ProviderName) =>
+    apiFetch<void>(`/me/providers/${provider}`, { method: "DELETE" }),
+  testProvider: (provider: ProviderName) =>
+    apiFetch<ProviderConnectionTestOut>(`/me/providers/${provider}/test`, { method: "POST" }),
+  export: () => apiFetch<UserDataExport>("/me/export"),
+  dashboard: () => apiFetch<DashboardOut>("/me/dashboard"),
+  progress: (family?: string) =>
+    apiFetch<ProgressOut>(`/me/progress${family ? `?family=${encodeURIComponent(family)}` : ""}`),
+  scenarioProgress: () => apiFetch<Record<string, ScenarioProgressOut>>("/me/scenario-progress"),
   delete: () => apiFetch<void>("/me", { method: "DELETE" }),
 };
 
@@ -38,6 +84,8 @@ export const scenarios = {
 
 export const personas = {
   list: () => apiFetch<PersonaOut[]>("/personas"),
+  mintVoicePreviewToken: (id: string) =>
+    apiFetch<VoicePreviewTokenOut>(`/personas/${id}/voice-preview-token`, { method: "POST" }),
 };
 
 export const rubrics = {
@@ -51,6 +99,10 @@ export interface CreateSessionBody {
   target_minutes: 5 | 10 | 20 | 30;
   focus_areas?: string[];
   resume_text_override?: string | null;
+  // Task 4.5a — only the recruited-session consent screen sends these explicitly; an ordinary
+  // session omits them and the account's own Settings > Privacy default applies server-side.
+  recording_consent?: boolean;
+  training_consent?: boolean;
 }
 
 export const sessions = {

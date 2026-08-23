@@ -9,6 +9,7 @@ function turn(index: number, start_ms: number, end_ms: number): TurnOut {
     index,
     speaker: index % 2 === 0 ? "persona" : "user",
     text: `turn ${index}`,
+    text_scrubbed: null,
     start_ms,
     end_ms,
     word_timings: [],

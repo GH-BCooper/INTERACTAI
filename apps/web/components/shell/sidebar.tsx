@@ -1,15 +1,25 @@
 "use client";
 
 import { clsx } from "clsx";
-import { History, LayoutGrid, PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
+import {
+  History,
+  LayoutDashboard,
+  LayoutGrid,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useShellStore } from "@/stores/shell-store";
 
 const NAV_ITEMS = [
-  { href: "/app", label: "Practice library", icon: LayoutGrid },
+  { href: "/app", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/app/scenarios", label: "Scenario library", icon: LayoutGrid },
   { href: "/app/sessions", label: "Session history", icon: History },
+  { href: "/app/progress", label: "Progress", icon: TrendingUp },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 

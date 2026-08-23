@@ -28,10 +28,10 @@ export default function SessionHistoryPage() {
               No sessions yet — start your first one from the practice library.
             </p>
             <a
-              href="/app"
+              href="/app/scenarios"
               className="mt-3 inline-block text-sm text-[var(--accent)] hover:text-[var(--accent-hover)]"
             >
-              Go to practice library
+              Go to the scenario library
             </a>
           </div>
         )}

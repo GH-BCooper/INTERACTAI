@@ -56,16 +56,31 @@ export interface MicCaptureHandle {
   stop: () => Promise<void>;
 }
 
+export interface MicCaptureConstraints {
+  deviceId?: string;
+  echoCancellation?: boolean;
+  noiseSuppression?: boolean;
+}
+
 /** Wires getUserMedia -> AudioContext -> AudioWorkletNode -> handlers. Requires a real browser
  * environment (AudioWorklet, MediaDevices); not exercised by the vitest (node) suite — see
- * `buildUpstreamWireFrame` above for the part of this file that is. */
-export async function createMicCapture(handlers: MicCaptureHandlers): Promise<MicCaptureHandle> {
+ * `buildUpstreamWireFrame` above for the part of this file that is.
+ *
+ * `constraints` is optional and defaults to exactly the previous hardcoded behaviour — Task 4.4's
+ * Settings > Audio page (device picker, echo-cancellation/noise-suppression toggles) is the only
+ * caller that ever passes it explicitly; the live practice room's own default capture is
+ * unaffected unless the caller opts in. */
+export async function createMicCapture(
+  handlers: MicCaptureHandlers,
+  constraints?: MicCaptureConstraints,
+): Promise<MicCaptureHandle> {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
+      echoCancellation: constraints?.echoCancellation ?? true,
+      noiseSuppression: constraints?.noiseSuppression ?? true,
       autoGainControl: true,
       channelCount: 1,
+      ...(constraints?.deviceId ? { deviceId: { exact: constraints.deviceId } } : {}),
     },
   });
 

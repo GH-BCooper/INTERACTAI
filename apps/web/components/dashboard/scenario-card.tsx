@@ -1,8 +1,17 @@
 "use client";
 
+import { ScoreBadge } from "@/components/score/score-badge";
 import type { ScenarioOut } from "@/lib/api/types";
 
-export function ScenarioCard({ scenario, onStart }: { scenario: ScenarioOut; onStart: () => void }) {
+export function ScenarioCard({
+  scenario,
+  onStart,
+  bestScore = null,
+}: {
+  scenario: ScenarioOut;
+  onStart: () => void;
+  bestScore?: number | null;
+}) {
   return (
     <button
       type="button"
@@ -16,6 +25,12 @@ export function ScenarioCard({ scenario, onStart }: { scenario: ScenarioOut; onS
       <span className="text-xs text-[var(--text-secondary)]">
         {scenario.difficulty} · {scenario.duration_minutes} min
       </span>
+      {bestScore !== null && (
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
+          <span>Your best:</span>
+          <ScoreBadge score={bestScore} />
+        </div>
+      )}
     </button>
   );
 }

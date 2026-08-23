@@ -67,14 +67,14 @@ export function CommandPalette() {
 
           <Command.Group heading="Actions" className="px-2 py-1 text-xs text-[var(--text-tertiary)]">
             <Command.Item
-              onSelect={() => go("/app")}
+              onSelect={() => go("/app/scenarios")}
               className="cursor-pointer rounded px-2 py-2 text-sm data-[selected=true]:bg-[var(--bg-raised)]"
             >
               Start a new session
             </Command.Item>
             {lastScenarioId && (
               <Command.Item
-                onSelect={() => go(`/app?scenario=${lastScenarioId}`)}
+                onSelect={() => go(`/app/scenarios?scenario=${lastScenarioId}`)}
                 className="cursor-pointer rounded px-2 py-2 text-sm data-[selected=true]:bg-[var(--bg-raised)]"
               >
                 Repeat last scenario
@@ -103,7 +103,7 @@ export function CommandPalette() {
                 <Command.Item
                   key={s.id}
                   value={`${s.title} ${s.family} ${s.difficulty}`}
-                  onSelect={() => go(`/app?scenario=${s.id}`)}
+                  onSelect={() => go(`/app/scenarios?scenario=${s.id}`)}
                   className="cursor-pointer rounded px-2 py-2 text-sm data-[selected=true]:bg-[var(--bg-raised)]"
                 >
                   {s.title}

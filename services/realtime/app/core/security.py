@@ -83,3 +83,29 @@ def validate_replay_token(token: str, *, expected_session_id: str) -> ReplayToke
     if session_id is None or session_id != expected_session_id:
         raise AuthInvalidTokenError("Replay token is not scoped to this session.")
     return ReplayTokenClaims(session_id=session_id, user_id=payload["user_id"])
+
+
+@dataclass(frozen=True)
+class VoicePreviewTokenClaims:
+    voice_id: str
+    user_id: str
+
+
+def validate_voice_preview_token(token: str, *, expected_voice_id: str) -> VoicePreviewTokenClaims:
+    """Task 4.2's scenario-library voice preview — same secret/scheme as a WS or replay token,
+    `typ: "voice_preview"` so it can never substitute for either. Minted by the API service's
+    `POST /personas/{id}/voice-preview-token` (services/api/app/core/security.py::
+    mint_voice_preview_token); not single-use, since a settings/library page may reasonably let
+    someone replay the same preview a few times."""
+    settings = get_settings()
+    try:
+        payload = jwt.decode(token, settings.ws_token_secret, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError as exc:
+        raise AuthInvalidTokenError("Voice preview token invalid or expired.") from exc
+
+    if payload.get("typ") != "voice_preview":
+        raise AuthInvalidTokenError("Wrong token type for this endpoint.")
+    voice_id = payload.get("voice_id")
+    if voice_id is None or voice_id != expected_voice_id:
+        raise AuthInvalidTokenError("Voice preview token is not scoped to this voice.")
+    return VoicePreviewTokenClaims(voice_id=voice_id, user_id=payload["user_id"])

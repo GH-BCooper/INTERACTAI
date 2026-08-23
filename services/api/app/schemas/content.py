@@ -17,6 +17,15 @@ class PersonaOut(BaseModel):
     brief: str
 
 
+class VoicePreviewTokenOut(BaseModel):
+    """Task 4.2: scopes a browser call directly to realtime's `POST /synthesize-preview` — a
+    pre-synthesised sample, without starting a session."""
+
+    token: str
+    expires_in: int
+    voice_id: str
+
+
 class ScenarioOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -206,6 +206,30 @@ def mint_replay_token(session_id: str, user_id: str) -> str:
     return jwt.encode(payload, settings.ws_token_secret, algorithm=JWT_ALGORITHM)
 
 
+# ── Voice preview token (Task 4.2) ──────────────────────────────────────────────
+VOICE_PREVIEW_TOKEN_TTL_SECONDS = 300  # a settings/library page action, not a long-lived session
+
+
+def mint_voice_preview_token(voice_id: str, user_id: str) -> str:
+    """Task 4.2: "Voice preview plays a pre-synthesised sample without starting a session."
+    Scoped to a `voice_id`, not a session — persona voices aren't private data, so this only
+    needs "the caller is a signed-in user," proven by the CurrentUser dependency on the route
+    that calls this, the same way mint_replay_token above is. Same secret/scheme as a WS token,
+    `typ: "voice_preview"` so it can never be substituted for a WS handshake or replay token —
+    see services/realtime/app/core/security.py::validate_voice_preview_token for the other
+    half."""
+    settings = get_settings()
+    now = int(time.time())
+    payload = {
+        "typ": "voice_preview",
+        "voice_id": voice_id,
+        "user_id": user_id,
+        "iat": now,
+        "exp": now + VOICE_PREVIEW_TOKEN_TTL_SECONDS,
+    }
+    return jwt.encode(payload, settings.ws_token_secret, algorithm=JWT_ALGORITHM)
+
+
 # ── OAuth CSRF state ───────────────────────────────────────────────────────────
 def _oauth_state_key(state: str) -> str:
     return f"oauth_state:{state}"

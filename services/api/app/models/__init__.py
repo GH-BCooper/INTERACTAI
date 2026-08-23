@@ -2,22 +2,25 @@
 
 from .annotation import Annotation
 from .base import Base
+from .consent import Consent
 from .content import Persona, Rubric, RubricCriterion, Scenario
 from .jobs import FailedJob
 from .observability import LatencyEvent, ModelCall
 from .scoring import Report, SessionScore
 from .session import Session
 from .turn import Turn, TurnMetrics, TurnScore
-from .user import Profile, User
+from .user import Profile, ProviderCredential, User
 
 __all__ = [
     "Annotation",
     "Base",
+    "Consent",
     "FailedJob",
     "LatencyEvent",
     "ModelCall",
     "Persona",
     "Profile",
+    "ProviderCredential",
     "Report",
     "Rubric",
     "RubricCriterion",

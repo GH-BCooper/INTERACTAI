@@ -8,6 +8,8 @@ import { ApiError } from "@/lib/api/client";
 import type { Difficulty, ScenarioOut, TargetMinutes } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 
+import { ConsentScreen, type ConsentDecision } from "./consent-screen";
+
 const DIFFICULTIES: Difficulty[] = ["gentle", "standard", "hard"];
 const DURATIONS: TargetMinutes[] = [5, 10, 20, 30];
 
@@ -26,6 +28,11 @@ export function StartSessionDialog({
   const [targetMinutes, setTargetMinutes] = useState<TargetMinutes>(
     nearestDuration(scenario.duration_minutes),
   );
+  // Task 4.5a: "The recruited-session flow presents the consent screen before the audio
+  // check." An ordinary personal-practice session skips this entirely and falls back to the
+  // account's own Settings > Privacy default (services/api/app/services/session_service.py).
+  const [isRecruitedSession, setIsRecruitedSession] = useState(false);
+  const [showConsent, setShowConsent] = useState(false);
   const createSession = useCreateSession();
   const router = useRouter();
 
@@ -37,17 +44,40 @@ export function StartSessionDialog({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
-  async function begin() {
+  async function begin(consent?: ConsentDecision) {
     try {
       const session = await createSession.mutateAsync({
         scenario_id: scenario.id,
         difficulty,
         target_minutes: targetMinutes,
+        ...(consent
+          ? { recording_consent: consent.recordingConsent, training_consent: consent.trainingConsent }
+          : {}),
       });
       router.push(`/app/practice/${session.id}`);
     } catch {
       // Surfaced via createSession.error below.
     }
+  }
+
+  function onBeginClicked() {
+    if (isRecruitedSession) {
+      setShowConsent(true);
+      return;
+    }
+    void begin();
+  }
+
+  if (showConsent) {
+    return (
+      <ConsentScreen
+        onCancel={() => setShowConsent(false)}
+        onDecide={(decision) => {
+          setShowConsent(false);
+          void begin(decision);
+        }}
+      />
+    );
   }
 
   const errorMessage =
@@ -108,6 +138,15 @@ export function StartSessionDialog({
           ))}
         </select>
 
+        <label className="mt-4 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+          <input
+            type="checkbox"
+            checked={isRecruitedSession}
+            onChange={(e) => setIsRecruitedSession(e.target.checked)}
+          />
+          This is a recruited/research session (shows a consent screen first)
+        </label>
+
         {errorMessage && (
           <p role="alert" className="mt-3 text-xs text-[var(--danger)]">
             {errorMessage}
@@ -121,7 +160,7 @@ export function StartSessionDialog({
           <Button variant="ghost" size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" size="sm" onClick={begin} disabled={createSession.isPending}>
+          <Button variant="primary" size="sm" onClick={onBeginClicked} disabled={createSession.isPending}>
             {createSession.isPending ? "Starting…" : "Begin session"}
           </Button>
         </div>

@@ -52,6 +52,7 @@ turns = Table(
     metadata,
     Column("id", PGUUID(as_uuid=True)),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
     Column("session_id", PGUUID(as_uuid=True), ForeignKey("sessions.id"), nullable=False),
     Column("index", Integer, nullable=False),
     Column("speaker", Text, nullable=False),
@@ -60,6 +61,7 @@ turns = Table(
     Column("end_ms", Integer, nullable=False),
     Column("truncated", Boolean, nullable=False),
     Column("asr_confidence", Float),
+    Column("text_scrubbed", Text),
 )
 
 turn_metrics = Table(

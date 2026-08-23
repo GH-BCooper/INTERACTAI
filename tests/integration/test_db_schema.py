@@ -291,9 +291,10 @@ class TestTurnsIndexUsage:
             text(
                 """
                 INSERT INTO turns (id, created_at, updated_at, session_id, "index", speaker,
-                                    text, start_ms, end_ms, word_timings, truncated)
+                                    text, start_ms, end_ms, word_timings, truncated,
+                                    training_excluded)
                 SELECT gen_random_uuid(), now(), now(), :session_id, g, 'user', 'hi',
-                       0, 100, '[]'::jsonb, false
+                       0, 100, '[]'::jsonb, false, false
                 FROM generate_series(0, 999) AS g
                 """
             ),

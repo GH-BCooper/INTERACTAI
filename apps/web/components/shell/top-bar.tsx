@@ -10,17 +10,21 @@ import { Button } from "../ui/button";
 import { UserMenu } from "./user-menu";
 
 const BREADCRUMB_LABELS: Record<string, string> = {
-  app: "Practice library",
+  app: "Dashboard",
+  scenarios: "Scenario library",
   sessions: "Session history",
+  progress: "Progress",
   settings: "Settings",
 };
 
 function useBreadcrumb(pathname: string): string {
   const segments = pathname.split("/").filter(Boolean); // ["app", ...]
-  if (segments.length <= 1) return "Practice library";
-  const last = segments[segments.length - 1];
-  if (last && BREADCRUMB_LABELS[last]) return BREADCRUMB_LABELS[last];
-  if (segments[1] === "sessions") return "Report";
+  if (segments.length <= 1) return "Dashboard";
+  const first = segments[1];
+  if (first && BREADCRUMB_LABELS[first] && segments.length === 2) return BREADCRUMB_LABELS[first];
+  if (first === "scenarios") return "Scenario detail";
+  if (first === "sessions") return "Report";
+  if (first === "settings") return "Settings";
   return "InteractAI";
 }
 
@@ -43,7 +47,7 @@ export function TopBar({ me }: { me: MeOut }) {
       </button>
 
       <div className="ml-auto flex items-center gap-3">
-        <Link href="/app">
+        <Link href="/app/scenarios">
           <Button variant="primary" size="sm">
             Start practice
           </Button>

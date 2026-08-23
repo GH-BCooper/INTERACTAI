@@ -2,7 +2,16 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { me, personas, rubrics, scenarios, sessions, type CreateSessionBody } from "./resources";
+import {
+  me,
+  personas,
+  rubrics,
+  scenarios,
+  sessions,
+  type CreateSessionBody,
+  type ProfileUpdateBody,
+} from "./resources";
+import type { ProviderName } from "./types";
 
 export function useMe() {
   return useQuery({ queryKey: ["me"], queryFn: me.get });
@@ -11,16 +20,105 @@ export function useMe() {
 export function useUpdateProfile() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: me.updateProfile,
+    mutationFn: (body: ProfileUpdateBody) => me.updateProfile(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
   });
 }
 
-export function useScenarios(filters?: { family?: string; difficulty?: string; duration?: number }) {
+export function useCompleteOnboarding() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: me.completeOnboarding,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
+  });
+}
+
+export function usePrivacySettings() {
+  return useQuery({ queryKey: ["me", "privacy"], queryFn: me.getPrivacy });
+}
+
+export function useUpdatePrivacySettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: me.updatePrivacy,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me", "privacy"] }),
+  });
+}
+
+export function useModelsSettings() {
+  return useQuery({ queryKey: ["me", "models"], queryFn: me.getModels });
+}
+
+export function useUpdateModelsSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: me.updateModels,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me", "models"] }),
+  });
+}
+
+export function useProviders() {
+  return useQuery({ queryKey: ["me", "providers"], queryFn: me.listProviders });
+}
+
+export function useSaveProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ provider, apiKey }: { provider: ProviderName; apiKey: string }) =>
+      me.saveProvider(provider, apiKey),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me", "providers"] }),
+  });
+}
+
+export function useDeleteProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (provider: ProviderName) => me.deleteProvider(provider),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me", "providers"] }),
+  });
+}
+
+export function useTestProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (provider: ProviderName) => me.testProvider(provider),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me", "providers"] }),
+  });
+}
+
+export function useExportMyData() {
+  return useMutation({ mutationFn: me.export });
+}
+
+export function useDashboard() {
+  return useQuery({ queryKey: ["me", "dashboard"], queryFn: me.dashboard });
+}
+
+export function useProgress(family?: string) {
+  return useQuery({
+    queryKey: ["me", "progress", family ?? null],
+    queryFn: () => me.progress(family),
+  });
+}
+
+export function useScenarioProgress() {
+  return useQuery({ queryKey: ["me", "scenario-progress"], queryFn: me.scenarioProgress });
+}
+
+export function useScenarios(filters?: {
+  family?: string;
+  difficulty?: string;
+  duration?: number;
+  tag?: string;
+}) {
   return useQuery({
     queryKey: ["scenarios", filters ?? {}],
     queryFn: () => scenarios.list(filters),
   });
+}
+
+export function useDeleteMe() {
+  return useMutation({ mutationFn: me.delete });
 }
 
 export function useScenario(id: string | undefined) {

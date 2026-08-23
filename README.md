@@ -9,9 +9,12 @@ Full build kit and specifications: `docs/00-START-HERE (1).md`. Repository conve
 
 ## Status
 
-Phases 0-3 complete — see `docs/PROGRESS.md`. That means: the full voice loop (VAD, endpointing,
-streaming ASR, persona, streaming TTS), the turn state machine, the coach agent (scoring +
-narration), and the web app — sign-in, the practice room, and the report/replay surface.
+Phases 0-4's coding tasks complete — see `docs/PROGRESS.md`. That means: the full voice loop
+(VAD, endpointing, streaming ASR, persona, streaming TTS), the turn state machine, the coach
+agent (scoring + narration), the web app (sign-in, the practice room, the report/replay surface,
+the dashboard, scenario library, onboarding, progress and settings), consent tracking and PII
+scrubbing. Phase 4's Task 4.6 (recruited usability sessions with real participants) is not a
+coding task and has not been run.
 
 ## Quick start
 

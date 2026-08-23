@@ -23,6 +23,7 @@ from ..db.repository import (
     get_turn_scores_for_session,
     get_turns_for_session,
     insert_model_call,
+    set_turns_scrubbed_text,
     upsert_report,
     upsert_session_score,
     upsert_turn_score,
@@ -34,6 +35,7 @@ from ..deterministic.metrics import (
     compute_delivery_score,
 )
 from ..narrator.narrator import CriterionForNarrative, generate_narrative
+from ..privacy.scrub import scrub_session_turns
 from ..scorer import RubricCriterion, get_scorer
 from .aggregation import (
     aggregate_criterion,
@@ -213,6 +215,16 @@ async def generate_report(ctx: dict[str, Any], *, session_id: str, wait_attempt:
                 _defer_by=GENERATE_REPORT_DEFER_S,
             )
             return
+
+    # Task 4.5b (AS-06): scrub every turn's transcript before anything downstream could treat
+    # this session as ready for annotation/dataset use. Runs once the score-wait loop above has
+    # actually settled (not on every deferred retry) — a pure, session-scoped operation, so
+    # re-running it on a later `generate_report` call (e.g. a rescore) is harmless idempotent
+    # overwrite, not a correctness risk.
+    if turns:
+        scrubbed_by_turn_id = scrub_session_turns(turns)
+        async with sessionmaker() as db:
+            await set_turns_scrubbed_text(db, scrubbed_by_turn_id)
 
     all_truncated = bool(user_turns) and all(bool(t["truncated"]) for t in user_turns)
     low_sample_size = len(user_turns) < LOW_SAMPLE_SIZE_THRESHOLD

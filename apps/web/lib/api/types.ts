@@ -15,19 +15,62 @@ export interface UserOut {
   name: string | null;
   avatar_url: string | null;
   created_at: string;
+  onboarded_at: string | null;
 }
+
+export type Goal = "job_interview" | "technical_interview" | "salary_negotiation";
+export type ExperienceLevel = "student" | "early_career" | "mid_level" | "senior" | "staff_plus";
 
 export interface ProfileOut {
   id: string;
   resume_text: string | null;
   resume_updated_at: string | null;
   target_role: string | null;
+  goal: Goal | null;
+  experience_level: ExperienceLevel | null;
+  focus_areas: string[];
+  captions_default: boolean;
+  speaking_rate: number;
+  noise_suppression: boolean;
+  echo_cancellation: boolean;
+}
+
+export interface PrivacySettingsOut {
+  training_consent: boolean;
+  audio_retention_days: number;
+}
+
+export interface ModelsSettingsOut {
+  prefer_local_models: boolean;
+}
+
+export type ProviderName = "groq";
+export type ConnectionTestStatus = "untested" | "success" | "failed";
+
+export interface ProviderCredentialOut {
+  provider: ProviderName;
+  has_key: boolean;
+  last_test_status: ConnectionTestStatus;
+  last_tested_at: string | null;
+}
+
+export interface ProviderConnectionTestOut {
+  provider: ProviderName;
+  success: boolean;
+  message: string;
+  tested_at: string;
 }
 
 export interface MeOut {
   user: UserOut;
   profile: ProfileOut | null;
   practice_minutes_this_week: number;
+}
+
+export interface VoicePreviewTokenOut {
+  token: string;
+  expires_in: number;
+  voice_id: string;
 }
 
 export interface PersonaOut {
@@ -158,6 +201,7 @@ export interface TurnOut {
   index: number;
   speaker: Speaker;
   text: string;
+  text_scrubbed: string | null;
   start_ms: number;
   end_ms: number;
   word_timings: WordTimingOut[];
@@ -192,4 +236,126 @@ export interface Page<T> {
   total: number;
   limit: number;
   offset: number;
+}
+
+// ── Task 4.1/4.4 — dashboard, recommendation, progress ──────────────────────────────────────
+
+export type RecommendationKind = "continue_session" | "start_scenario";
+
+export interface RecommendationOut {
+  kind: RecommendationKind;
+  reason: string;
+  session_id: string | null;
+  scenario_id: string | null;
+}
+
+export interface ProgressStripOut {
+  sessions_this_week: number;
+  total_minutes_this_week: number;
+  overall_score: number | null;
+  overall_score_delta: number | null;
+  weakest_criterion_name: string | null;
+}
+
+export interface RecentSessionOut {
+  id: string;
+  scenario_title: string;
+  created_at: string;
+  duration_ms: number | null;
+  overall_score: number | null;
+  report_read: boolean;
+}
+
+export type AttentionKind = "unread_report" | "stalled_scenario" | "declining_criterion";
+
+export interface AttentionItemOut {
+  kind: AttentionKind;
+  text: string;
+  session_id: string | null;
+  scenario_id: string | null;
+}
+
+export interface DashboardOut {
+  recommendation: RecommendationOut;
+  progress_strip: ProgressStripOut;
+  recent_sessions: RecentSessionOut[];
+  attention: AttentionItemOut | null;
+}
+
+export interface ScenarioAttemptOut {
+  session_id: string;
+  created_at: string;
+  overall_score: number | null;
+}
+
+export interface ScenarioProgressOut {
+  attempts: number;
+  best_score: number | null;
+  recent_attempts: ScenarioAttemptOut[];
+}
+
+export interface CriterionTrendPointOut {
+  session_id: string;
+  created_at: string;
+  score: number;
+}
+
+export interface CriterionTrendOut {
+  criterion_key: string;
+  name: string;
+  points: CriterionTrendPointOut[];
+}
+
+export interface WeeklyVolumePointOut {
+  week_start: string;
+  minutes: number;
+  sessions: number;
+}
+
+export interface PersonalBestOut {
+  criterion_key: string;
+  name: string;
+  score: number;
+  session_id: string;
+  achieved_at: string;
+}
+
+export interface WeakestDimensionOut {
+  criterion_key: string;
+  name: string;
+  trend: number;
+  next_action: string;
+}
+
+export interface ProgressOut {
+  family: string;
+  families_available: string[];
+  criterion_trends: CriterionTrendOut[];
+  weekly_volume: WeeklyVolumePointOut[];
+  families_attempted: string[];
+  families_never_attempted: string[];
+  weakest_dimension: WeakestDimensionOut | null;
+  personal_bests: PersonalBestOut[];
+}
+
+export interface UserDataExport {
+  exported_at: string;
+  user: { id: string; email: string; name: string | null; created_at: string };
+  profile: {
+    target_role: string | null;
+    goal: string | null;
+    experience_level: string | null;
+    resume_text: string | null;
+  } | null;
+  sessions: Array<{
+    id: string;
+    scenario_id: string;
+    status: string;
+    created_at: string;
+    started_at: string | null;
+    ended_at: string | null;
+    duration_ms: number | null;
+    target_minutes: number;
+    turns: TurnOut[];
+  }>;
 }

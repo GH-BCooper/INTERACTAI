@@ -33,7 +33,7 @@ from .core.config import get_settings
 from .core.exceptions import AuthInvalidTokenError
 from .core.logging import configure_logging, get_logger
 from .core.redis_client import get_redis_pool
-from .core.security import validate_replay_token
+from .core.security import validate_replay_token, validate_voice_preview_token
 from .db.repository import close_session, insert_latency_events, insert_model_call, insert_turn
 from .db.session import get_sessionmaker
 from .endpointing.cascade import is_utterance_too_short
@@ -226,6 +226,55 @@ async def synthesize(body: SynthesizeRequest) -> Response:
         raise HTTPException(status_code=504, detail="Synthesis timed out.") from exc
     except Exception as exc:
         logger.warning("replay_synthesis_failed", voice_id=body.voice_id)
+        raise HTTPException(status_code=502, detail="Synthesis failed.") from exc
+
+    if result is None:
+        raise HTTPException(status_code=422, detail="No audio was produced for this text.")
+
+    audio, sample_rate = result
+    wav_bytes = pcm_to_wav_bytes(
+        float32_to_int16(audio).tobytes(), sample_rate=sample_rate, channels=1
+    )
+    return Response(content=wav_bytes, media_type="audio/wav")
+
+
+# Task 4.2: "Voice preview plays a pre-synthesised sample without starting a session." The
+# sentence is fixed server-side, never client-supplied — otherwise this endpoint would be an
+# open, unauthenticated-per-call TTS service for arbitrary text once someone has a token.
+VOICE_PREVIEW_SENTENCE = (
+    "Hi, I'll be conducting your practice session today — let's get started when you're ready."
+)
+
+
+class SynthesizePreviewRequest(BaseModel):
+    token: str
+    voice_id: str
+
+
+@app.post("/synthesize-preview")
+async def synthesize_preview(body: SynthesizePreviewRequest) -> Response:
+    """Task 4.2's scenario-library voice preview. Same synthesis path as `/synthesize` above,
+    gated by a token the API service mints (`POST /personas/{id}/voice-preview-token`) after
+    confirming the caller is signed in — persona voices aren't private data, so that's the only
+    check needed."""
+    try:
+        validate_voice_preview_token(body.token, expected_voice_id=body.voice_id)
+    except AuthInvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail=exc.message) from exc
+
+    models: ModelRegistry = app.state.models
+    if models.resources is None:
+        raise HTTPException(status_code=503, detail="Synthesis is not available yet.")
+
+    try:
+        result = await asyncio.wait_for(
+            synthesize_chunk(models.resources.voice_pool, body.voice_id, VOICE_PREVIEW_SENTENCE),
+            timeout=SYNTHESIZE_TIMEOUT_S,
+        )
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Synthesis timed out.") from exc
+    except Exception as exc:
+        logger.warning("voice_preview_synthesis_failed", voice_id=body.voice_id)
         raise HTTPException(status_code=502, detail="Synthesis failed.") from exc
 
     if result is None:

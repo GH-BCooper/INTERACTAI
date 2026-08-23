@@ -176,6 +176,22 @@ async def upsert_session_score(
     await db.commit()
 
 
+async def set_turns_scrubbed_text(db: AsyncSession, scrubbed_by_turn_id: dict[str, str]) -> None:
+    """Task 4.5b: writes `turns.text_scrubbed` for every turn in one session, in one
+    executemany-shaped batch. Never touches `text` — the unscrubbed original every other report/
+    replay/evidence-span surface reads stays exactly as it was."""
+    if not scrubbed_by_turn_id:
+        return
+    now = datetime.now(UTC)
+    for turn_id_str, scrubbed_text in scrubbed_by_turn_id.items():
+        await db.execute(
+            turns.update()
+            .where(turns.c.id == std_uuid.UUID(turn_id_str))
+            .values(text_scrubbed=scrubbed_text, updated_at=now)
+        )
+    await db.commit()
+
+
 async def get_scenario_family(db: AsyncSession, scenario_id: std_uuid.UUID) -> str | None:
     result = await db.execute(select(scenarios.c.family).where(scenarios.c.id == scenario_id))
     row = result.first()

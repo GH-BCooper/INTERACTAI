@@ -84,3 +84,7 @@ class Session(UUIDPk, TimestampMixin, Base):
         PGUUID(as_uuid=True), ForeignKey("sessions.id", ondelete="SET NULL"), index=True
     )
     retry_of_turn_id: Mapped[std_uuid.UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    # Task 4.1 — the dashboard's attention panel surfaces "an unread report." Set once, as a
+    # side effect of GET /sessions/{id}/report actually returning a ready report (never on the
+    # write path, never re-cleared — "read" is a one-way fact).
+    report_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

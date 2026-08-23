@@ -15,6 +15,14 @@ class SessionCreate(BaseModel):
     target_minutes: TargetMinutes
     focus_areas: list[str] = Field(default_factory=list)
     resume_text_override: str | None = None
+    # Task 4.5a: a Consent row is written for every session (services/session_service.py
+    # ::create_session). These are only ever sent explicitly by the recruited-session consent
+    # screen (shown "before the audio check") — an ordinary personal-practice session omits
+    # them and falls back to the account's own settings (recording is always on, since capture
+    # is how the product works at all; `training_consent` defaults to the user's
+    # `users.training_consent` toggle from Settings > Privacy).
+    recording_consent: bool | None = None
+    training_consent: bool | None = None
 
 
 class SessionOut(BaseModel):
@@ -120,6 +128,11 @@ class TurnOut(BaseModel):
     index: int
     speaker: Literal["user", "persona"]
     text: str
+    # Task 4.5b: PII-scrubbed transcript (services/coach/app/privacy/scrub.py), written once
+    # the session's report has been generated. NULL until then — never re-derived here, never
+    # fabricated (CLAUDE.md §10). `text` above stays the unscrubbed original this schema always
+    # returned; every existing evidence-span/replay consumer of `text` is unaffected.
+    text_scrubbed: str | None
     start_ms: int
     end_ms: int
     word_timings: list[WordTimingOut]

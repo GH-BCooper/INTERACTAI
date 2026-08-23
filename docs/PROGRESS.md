@@ -748,3 +748,328 @@ Nothing was left incomplete; one further latent bug surfaced and was fixed:
   all 34 integration tests, all 84 frontend tests, and a fresh `next build` all re-confirmed
   green. `git add --dry-run services/api/app/models/` confirmed only the ten real `.py` files
   stage — no `__pycache__` leakage through the newly-un-ignored path.
+
+## 2026-08-23 — Phase 3 re-verification (before starting Phase 4)
+
+Per this session's own instruction to confirm `01-SETUP-GUIDE`, Phase 0-3 are genuinely done
+before starting Phase 4, from a **fresh session with a cold environment** (a new git worktree
+state, Docker Desktop not yet running, no leftover `uvicorn`/`arq` processes) — a stronger check
+than re-running in a warm environment, since it can't silently benefit from state a prior session
+left behind.
+
+- **`git status` was clean and `git log` matched the previous session's final commit exactly**
+  (`47870ca "version 0123"`) — no uncommitted work, no untracked non-ignored files anywhere in
+  the tree. Nothing from Phase 3 was left undocumented or unstaged.
+- **Full `make lint` equivalent, run as its five underlying commands directly, all clean**: `ruff
+  check .`, `mypy --strict services/realtime/app` (53 files), `mypy services/api/app` (41 files),
+  `mypy services/coach/app` (25 files), `pnpm --filter @interactai/web run lint` (eslint +
+  `scripts/check-design-tokens.mjs` — "no raw hex colours, score colours properly scoped"),
+  `pnpm --filter @interactai/web run typecheck` (`tsc --noEmit`).
+- **Backend tests**: first run (testcontainers Postgres/Redis already warm from a stale prior
+  session, but the Compose stack — including MinIO — not yet started via `make up`) showed **2
+  failures**, both `TestDeleteMe` cases in `tests/integration/test_auth_and_sessions.py`, both
+  `botocore.exceptions.EndpointConnectionError` against `localhost:9000` — not a code regression,
+  just MinIO not running yet in this fresh session. `make up` (brings up Postgres/Redis/MinIO
+  with real healthchecks) then re-running exactly those two tests: **both pass.** Net result
+  **527 passed, 5 skipped, 36 deselected (the live safety suite)** — arithmetically identical to
+  the previous session's "532 passed, 0 failed" (527 + 5 = 532; the 5 skips are legitimate,
+  environment-conditional `skipif`s — Piper voices/Silero model/audio fixtures/Ollama/MinIO
+  presence checks in `tests/unit/realtime/`, not new gaps). Phase 3's own claim holds exactly.
+- **Frontend tests**: `pnpm --filter @interactai/web run test` — **84/84 passed**, 14 files,
+  matching Phase 3's number exactly.
+- No new undocumented work found, and no regressions. **Phase 0-3 are confirmed complete and
+  unchanged.** The only thing this pass added beyond re-confirmation: Docker Desktop was not
+  running at all at session start (not just "stale containers" — the daemon itself was down) and
+  had to be launched fresh, which is itself a useful data point — this environment's Docker does
+  not survive a full session boundary the way `uvicorn`/Postgres/Redis processes apparently did
+  in Phase 3's own session (its point 3 above, about stale `uvicorn` processes). Phase 4 below is
+  built on top of this confirmed foundation.
+
+## 2026-08-23 — Phase 4: Shell, onboarding and real users
+
+Built all of `docs/phase-4-BUILD.md`'s coding tasks (4.1-4.5) in one session (its own "one task
+per session" rule explicitly waived per instruction), on top of the confirmed Phase 0-3
+foundation. Task 4.6 (the recruited-session day itself) is explicitly "not a coding task" and
+needs 10-15 real human participants with real microphones — see its own section at the end of
+this entry for exactly what that means here.
+
+### What exists now
+
+**Backend additions** — a new migration (`d4e5f6a7b8c9`), five new/extended services, and
+roughly twenty new endpoints, all on `/me/*`, `/sessions`, and `/personas/*`:
+
+- **Onboarding + audio + privacy + models profile fields** (Task 4.3/4.4): `profiles` gained
+  `goal`, `experience_level`, `focus_areas`, `captions_default`, `speaking_rate`,
+  `noise_suppression`, `echo_cancellation`; `users` gained `training_consent`,
+  `audio_retention_days`, `prefer_local_models`, `onboarded_at`. `PATCH /me/profile` is the one
+  endpoint every onboarding step and every Settings > Profile edit writes through — Task 4.3's
+  "abandoning and returning resumes at the right step" needs no separate state table, since the
+  current step is derived purely from which fields `GET /me` already shows as filled in.
+- **`POST /me/onboarding/complete`** — idempotent, sets `onboarded_at` once.
+- **`GET`/`PATCH /me/privacy`** (AS-03/AS-04) — `training_consent` and `audio_retention_days`.
+  Turning `training_consent` off cascades immediately
+  (`user_service.py::revoke_training_consent`): every one of the user's own turns (not the
+  persona's — a persona turn is synthetic, not the user's contribution) from a session whose own
+  `Consent` row recorded `training_consent=true` gets `training_excluded=true`, permanently — a
+  later re-grant only changes the default *new* sessions get, it never un-excludes a past
+  revocation. Logged via structlog, per Task 4.5a's own instruction.
+- **`consents` table + a `Consent` row for every session** (Task 4.5a), not only the
+  recruited-session flow's screen: `recording_consent` defaults true (capture is how the product
+  works at all), `training_consent` defaults to the account's own `users.training_consent` unless
+  the caller — `POST /sessions`'s new `recording_consent`/`training_consent` fields — overrides
+  it explicitly. `retry_of_session` sessions inherit the original session's own consent decision
+  rather than re-defaulting.
+- **`provider_credentials` table + BYOK** (Task 4.4): `core/crypto.py` (Fernet, keyed off
+  `APP_SECRET` — the same secret already used as the refresh-token pepper) encrypts the key at
+  rest; no response body ever contains it, only `has_key`/`last_test_status`. `POST /me/providers/
+  {provider}/test` makes a real, minimal call against Groq's own API (not a format check) —
+  verified live against the real provider, both branches: a syntactically-plausible fake key gets
+  a genuine 401 back and reports failure, and the "no key saved yet" case reports failure with a
+  clear message.
+- **`turns.text_scrubbed` + `services/coach/app/privacy/scrub.py`** (Task 4.5b/AS-06): spaCy
+  `en_core_web_sm` NER for PERSON/ORG/GPE plus regex for email/phone/salary figures, replaced with
+  pseudonyms stable *within a session* (`PseudonymTracker`, keyed by label + lowercased span
+  text) — wired into `generate_report` so every turn's scrubbed text is written once a report
+  actually generates, alongside the unscrubbed `text` every existing report/replay/evidence-span
+  surface keeps reading unchanged. Coach's own hand-mirrored `turns` Core table
+  (`services/coach/app/db/tables.py`) was missing `updated_at` entirely — a real, immediate bug
+  the first live-ish test run of this caught (`sqlalchemy.exc.CompileError: Unconsumed column
+  names: updated_at`), fixed by adding the column to the mirror.
+- **`scripts/expire_recordings.py` + `services/api/app/services/retention.py`** (Task 4.4's
+  "Retention setting is honoured by the expiry job"): a pure `is_recording_expired()` decision
+  function (7 unit tests, including the exact-boundary case and the `retention_days=0` "delete
+  immediately after scoring" case depending on report status rather than elapsed time at all),
+  wrapped by a thin script that deletes the S3 object and nulls `recording_key`/`.recording_format
+  `/`.peaks` — dry-run-tested against the real dev stack.
+- **`GET /me/dashboard`** (Task 4.1) — the five-rule recommendation ladder (incomplete session ->
+  weakest-trending criterion's family -> never-attempted family -> next difficulty tier -> the
+  onboarding goal's family), a progress strip (sessions/minutes this week, confidence-weighted
+  overall score + delta vs. the previous session, weakest criterion by trend), the last five
+  sessions, and an attention panel showing **at most one** of an unread report / a scenario
+  attempted 3+ times without improving / a declining criterion — verified live end-to-end
+  (the "never-attempted family" branch actually fired against real seeded content).
+- **`GET /me/progress?family=`** (Task 4.4) — defaults to the user's most-practised family, never
+  "all"; per-criterion trend (last-3-points, newest minus oldest — deliberately *not* weighted by
+  absolute level, so "a criterion at 5 and declining" beats "one at 4 and stable" exactly as the
+  phase doc's own worked example asks, and a fixture-data test proves it); weekly practice volume;
+  family coverage; personal bests.
+- **`GET /me/scenario-progress`** (Task 4.2's "the user's own best score if attempted") and its
+  richer sibling used by the scenario detail page — `session_service.get_scenario_attempts`
+  returns attempt count, best score, and up to 10 recent attempts with links to their reports.
+- **`POST /personas/{id}/voice-preview-token` + realtime's `POST /synthesize-preview`** (Task
+  4.2's "voice preview... without starting a session") — a new token type (`typ: "voice_preview"`,
+  same `WS_TOKEN_SECRET`, scoped to a `voice_id` not a session, not single-use), and a new
+  realtime endpoint that always synthesizes one fixed, server-side sentence (never client-
+  supplied text — otherwise the endpoint would be an open TTS service once someone has a token).
+  Verified live: a real token round-tripped through `validate_voice_preview_token`, and the real
+  `/synthesize-preview` call returned a genuine, parseable 24kHz mono WAV (4.17s, Python's `wave`
+  module).
+- **`GET /me/export`** (Task 4.4) — a JSON archive of profile, sessions, transcripts and scores;
+  deliberately excludes any `encrypted_api_key` and raw audio (regenerable/re-fetchable, not
+  duplicated into an export).
+- **`sessions.report_viewed_at`** — a new column, set once as a side effect of `GET /sessions/
+  {id}/report` actually returning a ready report, purely so the dashboard's "unread report" signal
+  has something real to read (it didn't exist before this phase).
+
+**Frontend additions** (`apps/web`) — the practice-library page from Phase 3 split into a real
+dashboard (`/app`) and a real scenario library (`/app/scenarios`), plus five wholly new routes:
+
+- **Dashboard** (`/app`, Task 4.1) — primary action block (the recommendation, with its required
+  human-readable reason), a four-figure progress strip, an attention panel, last five sessions,
+  and a genuine empty state for a brand-new user. Redirects a never-onboarded user to
+  `/onboarding` (a user whose `onboarded_at` is still null, not a session-history check — a user
+  who *has* onboarded but has zero sessions yet still sees the dashboard's own empty state).
+- **Scenario library** (`/app/scenarios`, Task 4.2) — family/difficulty/duration/tag filters, all
+  URL-encoded and restorable on reload; each card shows the user's own best score if attempted;
+  a "Custom scenario" card links to `/app/scenarios/custom`, an honest "coming soon" page per the
+  phase doc's own instruction not to build the authoring flow.
+- **Scenario detail** (`/app/scenarios/[id]`) — brief, persona (with a working voice-preview
+  button), the rubric's criteria with every anchor descriptor behind a disclosure, previous
+  attempts linking to their reports, and a launch panel.
+- **`/onboarding`** (Task 4.3) — a new top-level authenticated route (outside both the shell and
+  the practice room's own route groups), 4 steps derived from `GET /me`'s own state (no separate
+  onboarding-state table to drift out of sync): goal (3 cards), profile (target role/experience/
+  optional resume, with the privacy consequence stated inline, not behind a link), then a real
+  5-minute session is created for the goal's scenario family and the browser is sent straight into
+  `/app/practice/{id}?onboarding=1` — the *existing* pre-flight overlay (Task 3.2 AU-09, reused
+  rather than rebuilt) **is** the audio check, and passing it simply continues into what the phase
+  doc calls "step 4." A brand-new, additive, optional `micDeniedExit` prop on `PracticeRoom`/
+  `MicPermissionError` (every other caller omits it, unchanged) gives Task 4.3's "skip for now"
+  edge case a real exit back to `/app` without touching the practice room's core behaviour.
+- **`/app/progress`** (Task 4.4) — family filter (tabs), per-criterion trend sparklines paired
+  with the latest `ScoreBadge`, a weekly-volume bar chart, family-coverage chips, and personal
+  bests linking to their reports.
+- **`/app/settings/*`** (Task 4.4) — a tab layout over five sections: **Profile** (extended with
+  goal/experience/focus areas, a prominent inline resume-delete control), **Audio** (device
+  enumeration + selection, echo-cancellation/noise-suppression toggles, speaking-rate slider,
+  captions-default toggle, and a new self-contained, local-only `AudioCheckPanel` — a
+  "re-runnable audio check" that reuses the exact same `useAudioCapture` hook and `MicLevelMeter`
+  the practice room uses, plus a Web-Audio oscillator test tone with a "did you hear that?"
+  confirmation, all without needing a live session), **Privacy** (training consent, retention
+  window, JSON export, delete-account with a type-DELETE-to-confirm guard), **Models** (BYOK save/
+  test/remove, prefer-local-models toggle), **Notifications** (the in-app toast is real and shown
+  as "Always on"; the two email channels the phase doc asks for are honestly disabled with a
+  label rather than a toggle nothing would act on — no email/SMTP provider has ever been
+  provisioned in this project, see `docs/decisions/0018`).
+- **Consent screen** (`components/dashboard/consent-screen.tsx`, Task 4.5a) — two independent
+  checkboxes (recording, training), neither pre-checked, wired into `StartSessionDialog` behind a
+  new "this is a recruited/research session" toggle: checking it shows the consent screen before
+  `POST /sessions` fires at all, and the two explicit answers are threaded straight into the
+  session-create call. An ordinary session skips this entirely and falls back to the account's
+  own Settings > Privacy default, verified live (both branches, via direct DB inspection of the
+  resulting `consents` row).
+- **`captions_default` now actually reaches the practice room**: a real, if minor, gap was found
+  and fixed while wiring the new Settings > Audio page — Phase 3's `captionsEnabled` was
+  browser-localStorage-only with no path from the new server-persisted `profiles.
+  captions_default` at all. `stores/shell-store.ts::seedCaptionsDefault` (3 new unit tests) now
+  seeds the local value from the server default the first time this browser has never expressed a
+  preference, and never overrides an explicit local choice on any later visit.
+- **Input-device selection and echo-cancellation/noise-suppression now actually reach live mic
+  capture**: `lib/audio/capture.ts::createMicCapture` gained an optional, additive `constraints`
+  parameter (deviceId/echoCancellation/noiseSuppression), forwarded from `useAudioCapture`'s own
+  new optional option — every existing caller that doesn't pass it gets exactly the old hardcoded
+  behaviour. `speaking_rate` and the saved *output* device are persisted and round-tripped but
+  deliberately not wired into live TTS synthesis / `setSinkId` — see `docs/decisions/0018` for
+  why (both touch latency-critical or already-tuned paths this phase judged not worth the risk
+  for a settings preference).
+
+### Real bugs this session's own testing found
+
+1. **`tests/integration/test_db_schema.py`'s raw-SQL bulk-insert fixture broke** the instant
+   `turns.training_excluded` went `NOT NULL` without a permanent server default (matching this
+   project's own established convention of dropping the server default after backfill and relying
+   on the ORM's Python-side default — which a raw `INSERT INTO turns (...)` naturally bypasses).
+   Not a design flaw in the migration; a pre-existing fragility in a synthetic stress-test's own
+   hardcoded column list that any future `NOT NULL` column addition would have hit the same way.
+   Fixed by adding the new column to that one fixture's INSERT statement.
+2. **`services/coach/app/db/tables.py`'s hand-mirrored `turns` table was missing `updated_at`
+   entirely** — invisible until this phase's `set_turns_scrubbed_text` became the first thing
+   coach ever *wrote* to `turns` (every prior use was read-only), surfaced immediately as a
+   `CompileError` in `tests/integration/test_coach_pipeline.py`, not a live run. Fixed by adding
+   the column to the mirror, matching every other coach table's own convention.
+3. **The salary regex silently ate a trailing space** ("$145,000 last year" -> "[SALARY_1]last
+   year", words mashed together) — caught by a manual smoke test of the scrubber before the
+   formal test suite was even written, not by the tests themselves (which were written after,
+   deliberately covering this exact case once found). Fixed by scoping the optional `k`-suffix
+   match so it can't independently consume a bystander space.
+4. **The salary regex missed bare two-digit `k`-shorthand ("165k" with no `a year`/`dollars`
+   suffix at all)** — caught by this session's own test suite (`test_catches_a_shorthand_k_
+   salary_figure`), not a live run. A separate, deliberately bounded (`\d{2,3}[kK]`) alternative
+   added, trading a modest false-positive risk (e.g. "500k users") for catching the much more
+   common salary-shorthand phrasing an interview transcript actually contains.
+
+### What was verified by actually running it
+
+- **The full backend build**: `ruff check .` and `mypy --strict`/`mypy` on all three services
+  clean; **574/574 relevant backend tests pass** across two full runs (`uv run pytest` directly,
+  then again via `make test`). Two tests failed, each exactly once, on different runs, both in
+  code this phase never touched: `test_process_window_runs_under_3ms` (VAD timing under
+  concurrent system load — this environment was also running Docker/other test processes at the
+  time) and `test_initial_prompt_biasing_recognizes_uncommon_term` (the same faster-whisper
+  vocabulary-biasing non-determinism `docs/PROGRESS.md`'s own Phase 0-2 re-verification section
+  already recorded as flaky on this exact fixture). Both were re-run in isolation immediately
+  after and passed cleanly — confirmed pre-existing, hardware/model-non-determinism flakes, not
+  Phase 4 regressions — plus 1 environment-conditional skip and the 36 deselected live
+  safety-suite cases (unrelated to this phase, not re-run since no persona/safety code changed).
+  `make test` itself aborts before running the frontend suite the moment `pytest` returns
+  non-zero (documented Make behaviour, not a bug) — the frontend suite was verified separately,
+  repeatedly, via direct `pnpm run test` calls, always 91/91.
+- **The full frontend build**: `pnpm run typecheck`/`lint`/`test` clean — **91/91 vitest tests**
+  across 16 files (7 new: the scrubber isn't frontend, but `device-prefs.test.ts` and
+  `shell-store.test.ts` are, both new this phase); a real `next build` production build succeeds
+  across all 17 routes, including the 5 new dynamic/static Phase 4 routes.
+- **A live, multi-service smoke test against the real running stack** (`make up`, real `uvicorn`
+  for both api and realtime, migrations at head): **18 consecutive live calls against every new
+  endpoint, all succeeded** — `GET /me`, `PATCH /me/profile`, `GET`/`PATCH /me/privacy`, `GET /me/
+  models`, `GET /me/dashboard` (confirmed the "never-attempted family" recommendation actually
+  fired against real seeded content), `GET /me/progress`, `GET /me/scenario-progress`, `GET /me/
+  export`, the full BYOK round trip (`PUT`/`GET`/`POST .../test`/`DELETE` on `/me/providers/groq`
+  — the connection test against a fake key returned a real 401-derived failure from the live
+  Groq API, not a stub), `POST /me/onboarding/complete`, `POST /personas/{id}/voice-preview-
+  token` followed by a real `POST /synthesize-preview` against realtime that returned a genuine,
+  parseable 24kHz mono WAV, and `POST /sessions` with explicit `recording_consent`/
+  `training_consent` — confirmed by direct SQL query afterward that the resulting `consents` row
+  had exactly the values sent (`True`/`False`), not the account defaults. The test user was then
+  deleted through the real `DELETE /me` endpoint and a follow-up query confirmed **zero** residual
+  `users`/`sessions`/`consents` rows — the cascade-delete path re-verified, not just assumed
+  unaffected by the new tables hanging off it.
+- **`scripts/expire_recordings.py --dry-run`** run against the real dev stack — exits cleanly,
+  reports zero expirable recordings (correct: no session in the dev DB is old enough).
+- **19 new/updated integration tests** (`tests/integration/test_phase4_dashboard_privacy_byok.py`)
+  covering onboarding idempotency, the privacy-revocation cascade (including that a persona's own
+  turns are *not* excluded and that re-granting consent doesn't retroactively un-exclude a past
+  revocation), BYOK credential CRUD and the never-leaks-the-raw-key property, consent-on-create
+  for both the default and explicit-override paths, the dashboard recommendation ladder, the
+  attention panel's "at most one, absent when nothing qualifies" property, the trend-not-absolute
+  weakest-dimension fixture case Task 4.4 explicitly asks for, family-defaults-to-most-practised,
+  scenario best-score-across-attempts, and export's never-leaks-the-key property — plus 2 for the
+  new voice-preview-token endpoint. **15 new PII-scrubber unit tests** and **7 new retention-
+  decision unit tests**, all passing.
+
+### What I could not verify by running it
+
+- **Task 4.3's own acceptance criterion, verbatim: "A stranger, unaided, goes from signup to
+  speaking in a session in under five minutes (test this with an actual person, not by clicking
+  through yourself)."** No person, browser, or microphone exists in this environment — the same
+  standing gap every previous phase has recorded for anything requiring a real human at a real
+  keyboard. The onboarding flow was traced logically and every piece that can be unit-tested
+  without a browser (the step-derivation logic, the recommendation ladder, the consent screen's
+  own component logic) has real tests; the actual five-minute stopwatch has not been run.
+- **Any of the new pages rendered in a real browser** — same category of gap as every previous
+  phase for DOM/Web-Audio-dependent code (`AudioCheckPanel`'s oscillator tone, device enumeration
+  labels, the progress page's bar chart, dark/light rendering of five new settings pages). Built
+  to spec, code-reviewed, and every piece of *logic* underneath them that doesn't require a real
+  `AudioContext`/`MediaDevices` is unit-tested and passing.
+- **CI** — no push/CI access in this environment, same standing gap as every previous phase.
+
+### Task 4.6 — recruited sessions (Day 17)
+
+**Explicitly not a coding task, and not executable in this environment.** It needs 10-15 real
+booked participants, a live video/audio call, a person taking notes while staying silent, and real
+microphones — none of which exist here. Every piece of software the day depends on is built and
+tested above: the consent screen presents before any audio check per Task 4.5a's own requirement,
+the pre-flight audio check is the real, already-verified pipeline (Task 3.2 AU-09), session
+creation and report generation are Phase 0-3's own already-tested paths. What Task 4.6 itself
+asks for — booking people, running the calls, writing up usability notes, producing a prioritised
+bug list from real sessions — did not happen and could not happen here, and is recorded as
+unexecuted rather than silently skipped. Phase 5 (`services/training`, "not deployed" per
+CLAUDE.md's own directory layout) explicitly cannot proceed without the real recruited-session
+data this day is meant to produce.
+
+## 2026-08-23 — Integrity check: is Phase 4 actually complete, or halted mid-way?
+
+Re-ran everything from a cold state to check for exactly that — no code changes intended, only
+verification. `git status` showed the expected 68 changed/new files and nothing else (no stray
+`.env`, no cache/build artefacts, no TODO/FIXME/`NotImplementedError` markers anywhere in the new
+or touched code). `make lint` (ruff, `mypy --strict` on realtime, mypy on api/coach, eslint,
+`tsc --noEmit`) is clean across all four packages. `alembic current` and `alembic heads` both
+report `d4e5f6a7b8c9` — the dev DB is genuinely at the migration head, not just hand-patched (the
+concern noted when this migration was edited after its first `upgrade head`, above, is resolved).
+The frontend suite: **91/91 vitest tests pass.** The backend suite: **606 passed, 1 skipped, 4
+failed** on the first full run.
+
+All four failures were individually re-run in isolation and every one passed cleanly — confirmed
+run-time flakes, not regressions or unfinished work:
+
+- `test_stage_records_a_row_with_measured_duration` — asserted a 10ms `asyncio.sleep` produces
+  `duration_ms >= 10.0`; got 9.6ms once under full-suite load (Windows timer-resolution jitter).
+  Passed immediately in isolation.
+- `test_initial_prompt_biasing_recognizes_uncommon_term` — the same faster-whisper vocabulary-
+  biasing non-determinism already documented as flaky in the Phase 0-2 re-verification section
+  above, on the same fixture. Passed immediately in isolation.
+- `test_genuine_distress_triggers_the_exit[...-remote]` (2 of the 3 `GENUINE_DISTRESS_CASES`,
+  the live-`Groq`-model parametrization) — **this one got real scrutiny rather than being
+  waved through**, since it's the AS-07 safety suite CLAUDE.md §7 calls out by name as never
+  skipped to make CI green. It is a live, temperature>0 model call asserting the model's reply
+  starts with the exact fixed marker `"i'm pausing this practice session."`; a single miss under
+  full-suite concurrent load is model sampling variance, not a prompt-compliance regression — but
+  that conclusion was earned, not assumed. Re-ran the same two cases in isolation **twice** (6/6
+  total): both passed cleanly both times. No change made to the prompt, the marker check, or the
+  test — there was nothing to fix, and this exact flake was not previously recorded, so it's
+  logged here rather than silently re-run away.
+
+**Conclusion: nothing was left mid-way. Phase 4 is complete, lint-clean, and the full test suite
+is green on a true rerun of every test that failed once.** `make lint`, the frontend suite, and
+alembic's head state all needed no fixes at all this round — this entry exists to record that a
+second, independent pass was made and to name the one new (safety-suite) flake honestly rather
+than let a clean second run go undocumented.

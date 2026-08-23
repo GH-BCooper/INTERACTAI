@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { createMicCapture, type MicCaptureHandle } from "@/lib/audio/capture";
+import { createMicCapture, type MicCaptureConstraints, type MicCaptureHandle } from "@/lib/audio/capture";
 
 export type MicPermissionState =
   | "unknown"
@@ -24,6 +24,10 @@ interface UseAudioCaptureOptions {
    * value (the practice room's client-side barge-in guard) — kept separate from the DOM write
    * above rather than having that consumer read the value back out of a CSS custom property. */
   onLevel?: (rms: number) => void;
+  /** Task 4.4's Settings > Audio page — device/echo-cancellation/noise-suppression preferences.
+   * Read once, at `start()` time; omitted entirely by every caller that doesn't care (the
+   * previous hardcoded defaults apply unchanged). */
+  constraints?: MicCaptureConstraints;
 }
 
 export interface UseAudioCapture {
@@ -45,6 +49,7 @@ export function useAudioCapture({
   onFrame,
   meterElementRef,
   onLevel,
+  constraints,
 }: UseAudioCaptureOptions): UseAudioCapture {
   const [permission, setPermission] = useState<MicPermissionState>("unknown");
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -53,6 +58,8 @@ export function useAudioCapture({
   const stoppedRef = useRef(false);
   const onLevelRef = useRef(onLevel);
   onLevelRef.current = onLevel;
+  const constraintsRef = useRef(constraints);
+  constraintsRef.current = constraints;
 
   const handleMeter = useCallback(
     (rms: number) => {
@@ -67,17 +74,20 @@ export function useAudioCapture({
     setPermission("requesting");
     setErrorDetail(null);
     try {
-      const handle = await createMicCapture({
-        onFrame,
-        onMeter: handleMeter,
-        onTrackEnded: () => {
-          // The OS/browser pulled mic access out from under an already-running capture — pause
-          // rather than silently going deaf, and let the UI offer a one-click resume.
-          meterElementRef.current?.style.setProperty("--level", "0");
-          handleRef.current = null;
-          setPermission("revoked");
+      const handle = await createMicCapture(
+        {
+          onFrame,
+          onMeter: handleMeter,
+          onTrackEnded: () => {
+            // The OS/browser pulled mic access out from under an already-running capture —
+            // pause rather than silently going deaf, and let the UI offer a one-click resume.
+            meterElementRef.current?.style.setProperty("--level", "0");
+            handleRef.current = null;
+            setPermission("revoked");
+          },
         },
-      });
+        constraintsRef.current,
+      );
       if (stoppedRef.current) {
         // stop() was called while getUserMedia was still resolving.
         await handle.stop();

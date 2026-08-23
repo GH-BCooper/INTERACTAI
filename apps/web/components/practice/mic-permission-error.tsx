@@ -34,11 +34,14 @@ const GENERIC_STEPS = [
 interface MicPermissionErrorProps {
   state: Extract<MicPermissionState, "denied" | "no_device" | "revoked" | "error">;
   onRetry: () => void;
+  /** Task 4.3's onboarding edge case: "a 'skip for now' that clearly explains they cannot
+   * practise yet." Optional — omitted everywhere except the onboarding flow. */
+  secondaryAction?: { label: string; href: string };
 }
 
 /** Task 3.2 edge case: "Mic permission denied -> Browser-specific recovery instructions
  * (Chrome / Firefox / Safari differ, and macOS adds an OS layer). Not a generic message." */
-export function MicPermissionError({ state, onRetry }: MicPermissionErrorProps) {
+export function MicPermissionError({ state, onRetry, secondaryAction }: MicPermissionErrorProps) {
   const browser = useMemo(
     () => detectBrowser(typeof navigator === "undefined" ? "" : navigator.userAgent),
     [],
@@ -71,6 +74,19 @@ export function MicPermissionError({ state, onRetry }: MicPermissionErrorProps) 
       <Button variant="primary" size="sm" className="mt-5" onClick={onRetry}>
         Try again
       </Button>
+      {secondaryAction && (
+        <>
+          <p className="mt-3 text-xs text-[var(--text-tertiary)]">
+            You won&apos;t be able to practise until your microphone works.
+          </p>
+          <a
+            href={secondaryAction.href}
+            className="mt-1 inline-block text-xs text-[var(--text-secondary)] underline hover:text-[var(--text-primary)]"
+          >
+            {secondaryAction.label}
+          </a>
+        </>
+      )}
     </div>
   );
 }

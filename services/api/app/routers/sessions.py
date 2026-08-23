@@ -46,6 +46,8 @@ async def create_session(
         target_minutes=body.target_minutes,
         focus_areas=body.focus_areas,
         resume_text_override=body.resume_text_override,
+        recording_consent=body.recording_consent,
+        training_consent=body.training_consent,
     )
     await db.commit()
     return session_service.session_to_out(session)
@@ -114,10 +116,15 @@ async def mint_session_replay_token(
 
 @router.get("/{session_id}/report", response_model=ReportOut)
 async def get_session_report(session_id: UUID, user: CurrentUser, db: DbSession) -> ReportOut:
-    await _get_owned_or_raise(db, user, session_id)
+    session = await _get_owned_or_raise(db, user, session_id)
     report = await session_service.get_report(db, session_id)
     if report is None:
         raise NotFoundError("The report has not been generated yet.")
+    if report.status == "ready":
+        # Task 4.1: the dashboard's attention panel's "an unread report" — set the instant a
+        # ready report is actually returned to its owner, never re-cleared.
+        await session_service.mark_report_viewed(db, session)
+        await db.commit()
     return session_service.report_to_out(report)
 
 

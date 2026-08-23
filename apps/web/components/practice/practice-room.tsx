@@ -6,7 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAudioCapture } from "@/hooks/use-audio-capture";
 import { useRealtimeSocket } from "@/hooks/use-realtime-socket";
 import { ApiError } from "@/lib/api/client";
-import { usePersonas, useScenario, useSession } from "@/lib/api/hooks";
+import { useMe, usePersonas, useScenario, useSession } from "@/lib/api/hooks";
+import { getSavedInputDeviceId } from "@/lib/audio/device-prefs";
 import { useShellStore } from "@/stores/shell-store";
 import { usePracticeStore } from "@/stores/practice-store";
 
@@ -34,14 +35,29 @@ function FullPageMessage({ title, body }: { title: string; body?: string }) {
  * client: mic capture, the WS connection, audio playback and every piece of visible state.
  * No sidebar, no breadcrumb, no top bar — deliberately a different surface than the rest of the
  * authenticated app (docs/phase-3-LEARN.md §2). */
-export function PracticeRoom({ sessionId }: { sessionId: string }) {
+export function PracticeRoom({
+  sessionId,
+  micDeniedExit,
+}: {
+  sessionId: string;
+  /** Task 4.3's onboarding edge case: "Mic denied at step 3 -> ... a 'skip for now' that
+   * clearly explains they cannot practise yet." Optional and additive — every other caller of
+   * PracticeRoom omits this and MicPermissionError renders exactly as it did before. */
+  micDeniedExit?: { label: string; href: string };
+}) {
   const router = useRouter();
   const { data: session, error: sessionError } = useSession(sessionId);
   const { data: scenario } = useScenario(session?.scenario_id);
   const { data: personas } = usePersonas();
+  const { data: me } = useMe();
 
   const captionsEnabled = useShellStore((s) => s.captionsEnabled);
   const setCaptionsEnabled = useShellStore((s) => s.setCaptionsEnabled);
+  const seedCaptionsDefault = useShellStore((s) => s.seedCaptionsDefault);
+
+  useEffect(() => {
+    if (me?.profile) seedCaptionsDefault(me.profile.captions_default);
+  }, [me, seedCaptionsDefault]);
 
   const clientState = usePracticeStore((s) => s.clientState);
   const connection = usePracticeStore((s) => s.connection);
@@ -59,7 +75,24 @@ export function PracticeRoom({ sessionId }: { sessionId: string }) {
     useRealtimeSocket(sessionId);
 
   const onFrame = useCallback((frame: ArrayBuffer) => sendAudioFrame(frame), [sendAudioFrame]);
-  const capture = useAudioCapture({ onFrame, meterElementRef: meterRef, onLevel: observeMicRms });
+  // Task 4.4's Settings > Audio page: the account's echo-cancellation/noise-suppression
+  // preferences (server-persisted) plus the browser-local saved input device, if any. Both
+  // default to the previous hardcoded behaviour when unset, so a user who has never opened
+  // Settings gets exactly what they got before this existed.
+  const captureConstraints = useMemo(
+    () => ({
+      deviceId: getSavedInputDeviceId() ?? undefined,
+      echoCancellation: me?.profile?.echo_cancellation,
+      noiseSuppression: me?.profile?.noise_suppression,
+    }),
+    [me],
+  );
+  const capture = useAudioCapture({
+    onFrame,
+    meterElementRef: meterRef,
+    onLevel: observeMicRms,
+    constraints: captureConstraints,
+  });
 
   // Task 3.2 non-negotiable #1's meter also feeds the client-side barge-in guard
   // (hooks/use-realtime-socket.ts) — same RMS stream, two independent consumers.
@@ -157,7 +190,13 @@ export function PracticeRoom({ sessionId }: { sessionId: string }) {
   }
 
   if (capture.permission === "denied" || capture.permission === "no_device" || capture.permission === "revoked" || capture.permission === "error") {
-    return <MicPermissionError state={capture.permission} onRetry={() => void capture.start()} />;
+    return (
+      <MicPermissionError
+        state={capture.permission}
+        onRetry={() => void capture.start()}
+        secondaryAction={micDeniedExit}
+      />
+    );
   }
 
   return (

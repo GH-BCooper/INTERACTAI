@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid as std_uuid
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal, cast
 
@@ -15,6 +16,7 @@ from ..core.rate_limit import enforce_rate_limit
 from ..core.s3 import presign_get_url
 from ..models import (
     Annotation,
+    Consent,
     Report,
     Session,
     SessionScore,
@@ -23,6 +25,7 @@ from ..models import (
     TurnScore,
     User,
 )
+from ..models.consent import CURRENT_CONSENT_VERSION
 from ..schemas.session import (
     AnnotationCreate,
     NextActionOut,
@@ -136,6 +139,8 @@ async def create_session(
     target_minutes: int,
     focus_areas: list[str],
     resume_text_override: str | None,
+    recording_consent: bool | None = None,
+    training_consent: bool | None = None,
 ) -> Session:
     settings = get_settings()
 
@@ -180,6 +185,22 @@ async def create_session(
         brief=brief,
     )
     db.add(session)
+    await db.flush()
+
+    # Task 4.5a: a Consent row for every session, not only the recruited-session flow's
+    # explicit screen — recording is always on (capture is how the product works at all);
+    # training_consent falls back to the account's own Settings > Privacy default when the
+    # caller doesn't override it explicitly.
+    db.add(
+        Consent(
+            session_id=session.id,
+            recording_consent=recording_consent if recording_consent is not None else True,
+            training_consent=(
+                training_consent if training_consent is not None else user.training_consent
+            ),
+            consent_version=CURRENT_CONSENT_VERSION,
+        )
+    )
     await db.flush()
     return session
 
@@ -285,6 +306,7 @@ async def list_turns_with_scores(db: AsyncSession, session_id: std_uuid.UUID) ->
                 index=t.index,
                 speaker=cast(Literal["user", "persona"], t.speaker),
                 text=t.text,
+                text_scrubbed=t.text_scrubbed,
                 start_ms=t.start_ms,
                 end_ms=t.end_ms,
                 word_timings=[
@@ -473,7 +495,114 @@ async def create_retry_session(
     )
     db.add(retry_session)
     await db.flush()
+
+    original_consent_result = await db.execute(
+        select(Consent).where(Consent.session_id == original_session.id)
+    )
+    original_consent = original_consent_result.scalar_one_or_none()
+    db.add(
+        Consent(
+            session_id=retry_session.id,
+            recording_consent=(
+                original_consent.recording_consent if original_consent is not None else True
+            ),
+            training_consent=(
+                original_consent.training_consent
+                if original_consent is not None
+                else user.training_consent
+            ),
+            consent_version=CURRENT_CONSENT_VERSION,
+        )
+    )
+    await db.flush()
     return retry_session
+
+
+def compute_overall_score(scores: list[SessionScore]) -> tuple[float | None, float]:
+    """Confidence-weighted mean across *judged* criteria only — `delivery` is deterministic
+    arithmetic, not a rubric judgement, so folding it into "overall score" would blur exactly
+    the arithmetic-vs-judgement line CLAUDE.md §5 draws. `None` (never a fabricated number) when
+    no criterion has enough signal to contribute (CLAUDE.md §10)."""
+    signal = [
+        s
+        for s in scores
+        if s.criterion_key != DELIVERY_CRITERION_KEY and s.aggregate_score is not None
+    ]
+    if not signal:
+        return None, 0.0
+    weights: list[float] = [float(s.confidence) for s in signal]
+    total_weight = sum(weights)
+    if total_weight <= 0:
+        return None, 0.0
+    values: list[float] = [float(s.aggregate_score) for s in signal]  # type: ignore[arg-type]
+    weighted_sum = sum(v * w for v, w in zip(values, weights, strict=True))
+    return round(weighted_sum / total_weight, 2), round(total_weight / len(signal), 4)
+
+
+RECENT_ATTEMPTS_CAP = 10
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioAttemptSummary:
+    session_id: std_uuid.UUID
+    created_at: datetime
+    overall_score: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioAttempts:
+    count: int
+    best_score: float | None
+    recent: list[ScenarioAttemptSummary]  # newest first, capped at RECENT_ATTEMPTS_CAP
+
+
+async def get_scenario_attempts(
+    db: AsyncSession, user_id: std_uuid.UUID
+) -> dict[std_uuid.UUID, ScenarioAttempts]:
+    """Task 4.2's scenario library card ("the user's own best score if attempted") and detail
+    page ("previous attempts with scores"). Keyed by scenario_id."""
+    sessions_result = await db.execute(
+        select(Session)
+        .where(Session.user_id == user_id, Session.status == "closed")
+        .order_by(Session.created_at.desc())
+    )
+    sessions = list(sessions_result.scalars().all())
+    if not sessions:
+        return {}
+
+    session_ids = [s.id for s in sessions]
+    scores_result = await db.execute(
+        select(SessionScore).where(SessionScore.session_id.in_(session_ids))
+    )
+    scores_by_session: dict[std_uuid.UUID, list[SessionScore]] = defaultdict(list)
+    for row in scores_result.scalars().all():
+        scores_by_session[row.session_id].append(row)
+
+    by_scenario: dict[std_uuid.UUID, list[ScenarioAttemptSummary]] = defaultdict(list)
+    for s in sessions:  # newest first, matching the query order above
+        overall, _confidence = compute_overall_score(scores_by_session.get(s.id, []))
+        by_scenario[s.scenario_id].append(
+            ScenarioAttemptSummary(session_id=s.id, created_at=s.created_at, overall_score=overall)
+        )
+
+    out: dict[std_uuid.UUID, ScenarioAttempts] = {}
+    for scenario_id, attempts in by_scenario.items():
+        scored = [a.overall_score for a in attempts if a.overall_score is not None]
+        out[scenario_id] = ScenarioAttempts(
+            count=len(attempts),
+            best_score=max(scored) if scored else None,
+            recent=attempts[:RECENT_ATTEMPTS_CAP],
+        )
+    return out
+
+
+async def mark_report_viewed(db: AsyncSession, session: Session) -> None:
+    """Task 4.1: the dashboard's attention panel surfaces "an unread report" — this is the one
+    place that fact ever changes, fired as a side effect of the report route actually returning
+    a ready report (never re-cleared; "read" is a one-way fact)."""
+    if session.report_viewed_at is None:
+        session.report_viewed_at = datetime.now(UTC)
+        await db.flush()
 
 
 async def practice_minutes_this_week(db: AsyncSession, user_id: std_uuid.UUID) -> int:

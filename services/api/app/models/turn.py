@@ -61,6 +61,18 @@ class Turn(Base):
     )
     truncated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     asr_confidence: Mapped[float | None] = mapped_column(Float)
+    # Task 4.5a: "Training consent revocation cascades: turns are flagged training_excluded =
+    # true and are filtered out of every dataset build." Set by
+    # services/user_service.py::revoke_training_consent — never cleared automatically, since an
+    # exclusion must be permanent once logged (re-granting consent covers future sessions only,
+    # not turns already excluded from a past decision).
+    training_excluded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Task 4.5b: PII-scrubbed transcript, written once by services/coach's generate_report job
+    # (services/coach/app/privacy/scrub.py) alongside `text` above, which stays unscrubbed —
+    # every existing report/replay/evidence-span surface keeps reading `text`; this column is
+    # additive groundwork for a future dataset/annotation surface (CLAUDE.md §9: Phase 5 is out
+    # of scope here). NULL until a report has been generated for this turn's session.
+    text_scrubbed: Mapped[str | None] = mapped_column(Text)
 
 
 class TurnMetrics(Base):

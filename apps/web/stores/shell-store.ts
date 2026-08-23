@@ -10,6 +10,11 @@ interface ShellState {
    * state) since it belongs to the person, not the practice session. */
   captionsEnabled: boolean;
   setCaptionsEnabled: (enabled: boolean) => void;
+  /** Task 4.4's Settings > Audio "captions default" (server-persisted, `profiles.
+   * captions_default`) seeds this store's browser-local value the first time this browser has
+   * ever seen it — a local toggle the user already made here always wins over the server
+   * default on every later visit. */
+  seedCaptionsDefault: (serverDefault: boolean) => void;
 }
 
 const CAPTIONS_KEY = "interactai-captions-enabled";
@@ -33,6 +38,15 @@ function writeBool(key: string, value: boolean): void {
   }
 }
 
+function hasStoredValue(key: string): boolean {
+  if (typeof localStorage === "undefined") return false;
+  try {
+    return localStorage.getItem(key) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export const useShellStore = create<ShellState>((set, get) => ({
   sidebarCollapsed: readBool(SIDEBAR_KEY, false),
   toggleSidebar: () => {
@@ -47,5 +61,10 @@ export const useShellStore = create<ShellState>((set, get) => ({
   setCaptionsEnabled: (enabled) => {
     set({ captionsEnabled: enabled });
     writeBool(CAPTIONS_KEY, enabled);
+  },
+  seedCaptionsDefault: (serverDefault) => {
+    if (hasStoredValue(CAPTIONS_KEY)) return; // an explicit local choice already exists — keep it
+    set({ captionsEnabled: serverDefault });
+    writeBool(CAPTIONS_KEY, serverDefault);
   },
 }));
