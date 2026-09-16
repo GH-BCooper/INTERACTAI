@@ -33,7 +33,7 @@ export default function AuthCallbackPage() {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-sm font-medium">Sign-in didn&apos;t complete.</p>
-        <a href="/" className="text-sm text-[var(--accent)] hover:text-[var(--accent-hover)]">
+        <a href="/signin" className="text-sm text-[var(--accent)] hover:text-[var(--accent-hover)]">
           Back to sign in
         </a>
       </main>

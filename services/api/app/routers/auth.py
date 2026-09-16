@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
 from ..core.db import get_db
-from ..core.exceptions import AppError, AuthInvalidTokenError, AuthProviderError
+from ..core.exceptions import AppError, AuthInvalidTokenError, AuthProviderError, NotFoundError
 from ..core.rate_limit import enforce_rate_limit
 from ..core.redis_client import get_redis
 from ..core.security import (
@@ -33,7 +33,8 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         REFRESH_COOKIE_NAME,
         token,
         httponly=True,
-        secure=settings.environment != "development",
+        # http://localhost has no TLS; a Secure cookie would never be sent back there.
+        secure=settings.environment not in ("development", "selfhost"),
         samesite="lax",
         path="/auth",
         max_age=settings.refresh_token_ttl_days * 86400,
@@ -51,6 +52,33 @@ async def _enforce_auth_rate_limit(
         limit=settings.auth_rate_limit_per_minute,
         window_seconds=60,
     )
+
+
+LOCAL_USER_EMAIL = "local@selfhost.invalid"
+
+
+@router.get("/local/login", dependencies=[Depends(_enforce_auth_rate_limit)])
+async def local_login(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> Response:
+    """Phase 6 TASK 6.4d — the self-host sign-in. Enabled only by SELF_HOST_LOCAL_LOGIN and never
+    in production: it signs the browser into a single local account with no credential at all,
+    which is exactly right for `docker compose up` on your own machine and exactly wrong anywhere
+    else. Same token/cookie handoff as the OAuth callback below."""
+    settings = get_settings()
+    if not settings.self_host_local_login or settings.environment == "production":
+        raise NotFoundError("Local sign-in is disabled on this deployment.")
+
+    user = await user_service.get_or_create_local_user(db, email=LOCAL_USER_EMAIL)
+    await db.commit()
+    access_token = create_access_token(str(user.id))
+    refresh_token = await create_refresh_family(redis, str(user.id))
+    expires_in = settings.access_token_ttl_minutes * 60
+    location = f"{settings.web_origin}/auth/callback#token={access_token}&expires_in={expires_in}"
+    response = Response(status_code=307, headers={"Location": location})
+    _set_refresh_cookie(response, refresh_token)
+    return response
 
 
 @router.get("/{provider}/login", dependencies=[Depends(_enforce_auth_rate_limit)])

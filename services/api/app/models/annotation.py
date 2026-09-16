@@ -25,7 +25,10 @@ class Annotation(UUIDPk, TimestampMixin, Base):
     __tablename__ = "annotations"
     __table_args__ = (
         UniqueConstraint(
-            "turn_id", "annotator_id", "criterion_key", "round",
+            "turn_id",
+            "annotator_id",
+            "criterion_key",
+            "round",
             name="uq_annotations_turn_annotator_criterion_round",
         ),
         CheckConstraint("score BETWEEN 1 AND 5", name="ck_annotations_score_range"),

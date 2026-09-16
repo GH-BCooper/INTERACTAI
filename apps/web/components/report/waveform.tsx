@@ -44,7 +44,8 @@ export function Waveform({ containerRef, waveform, url, peaks, durationMs, turns
 
   return (
     <div>
-      <div ref={containerRef} className="w-full" />
+      {/* Reserves wavesurfer's 64px canvas height up front so mounting it causes no layout shift. */}
+      <div ref={containerRef} className="min-h-16 w-full" />
       {url === null && (
         <p className="mt-2 text-xs text-[var(--text-tertiary)]">
           The recording has expired — the transcript and scores below are unaffected.

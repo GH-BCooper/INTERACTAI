@@ -38,9 +38,7 @@ class Turn(Base):
         {"postgresql_partition_by": "RANGE (created_at)"},
     )
 
-    id: Mapped[std_uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), primary_key=True, default=uuid7
-    )
+    id: Mapped[std_uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid7)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), primary_key=True, server_default=func.now(), nullable=False
     )
@@ -83,9 +81,7 @@ class TurnMetrics(Base):
     __tablename__ = "turn_metrics"
     __table_args__ = (UniqueConstraint("turn_id", name="uq_turn_metrics_turn_id"),)
 
-    id: Mapped[std_uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), primary_key=True, default=uuid7
-    )
+    id: Mapped[std_uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid7)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -122,9 +118,7 @@ class TurnScore(Base):
         CheckConstraint("confidence BETWEEN 0 AND 1", name="ck_turn_scores_confidence_range"),
     )
 
-    id: Mapped[std_uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), primary_key=True, default=uuid7
-    )
+    id: Mapped[std_uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid7)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

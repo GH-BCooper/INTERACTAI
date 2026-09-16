@@ -92,8 +92,7 @@ def spearman_correlation(y_true: list[float], y_pred: list[float]) -> float:
     mean_true = sum(rank_true) / n
     mean_pred = sum(rank_pred) / n
     cov = sum(
-        (rt - mean_true) * (rp - mean_pred)
-        for rt, rp in zip(rank_true, rank_pred, strict=True)
+        (rt - mean_true) * (rp - mean_pred) for rt, rp in zip(rank_true, rank_pred, strict=True)
     )
     var_true = sum((rt - mean_true) ** 2 for rt in rank_true)
     var_pred = sum((rp - mean_pred) ** 2 for rp in rank_pred)

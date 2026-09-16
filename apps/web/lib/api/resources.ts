@@ -4,10 +4,18 @@ import type {
   AnnotationProgress,
   AnnotationQueueItem,
   AnnotationSubmitOut,
+  CompareOut,
+  CostPanelOut,
   DashboardOut,
   Difficulty,
+  EvalCaseRow,
+  EvalRunRow,
+  LatencyHeaderOut,
   MeOut,
+  ModelCallPage,
+  ModelVersionRow,
   ModelsSettingsOut,
+  ObservedTurn,
   Page,
   PersonaOut,
   PrivacySettingsOut,
@@ -15,6 +23,7 @@ import type {
   ProviderConnectionTestOut,
   ProviderCredentialOut,
   ProviderName,
+  RegressionOut,
   RecordingOut,
   ReplayTokenOut,
   ReportOut,
@@ -23,10 +32,12 @@ import type {
   ScenarioProgressOut,
   SessionOut,
   SessionScoreOut,
+  StageRow,
   TurnOut,
   UserDataExport,
   UserOut,
   VoicePreviewTokenOut,
+  WaterfallOut,
   WsTokenOut,
 } from "./types";
 
@@ -150,4 +161,56 @@ export const adminAnnotate = {
     pre_label_score?: number | null;
   }) => apiFetch<AnnotationSubmitOut>("/admin/annotate/submit", { method: "POST", body }),
   getProgress: () => apiFetch<AnnotationProgress>("/admin/annotate/progress"),
+};
+
+// Phase 6 TASK 6.1/6.2 — admin observability and evaluations. Promotion/rollback go through the
+// existing /admin/registry/* routes (Task 5.5c) — status changes only.
+function qs(params: Record<string, string | number | boolean | null | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export interface LatencyFilter {
+  days: number;
+  family?: string;
+  host_class?: string;
+}
+
+export interface ModelCallFilter {
+  role?: string;
+  model?: string;
+  cached?: boolean;
+  sort?: string;
+  order?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+}
+
+export const adminObservability = {
+  latency: (f: LatencyFilter) => apiFetch<LatencyHeaderOut>(`/admin/observability/latency${qs({ ...f })}`),
+  stages: (f: LatencyFilter) => apiFetch<StageRow[]>(`/admin/observability/stages${qs({ ...f })}`),
+  turns: () => apiFetch<ObservedTurn[]>("/admin/observability/turns"),
+  waterfall: (turnId: string) => apiFetch<WaterfallOut>(`/admin/observability/turns/${turnId}`),
+  replayToken: (sessionId: string) =>
+    apiFetch<ReplayTokenOut>(`/admin/observability/sessions/${sessionId}/replay-token`, { method: "POST" }),
+  recording: (sessionId: string) =>
+    apiFetch<RecordingOut>(`/admin/observability/sessions/${sessionId}/recording`),
+  modelCalls: (f: ModelCallFilter) => apiFetch<ModelCallPage>(`/admin/observability/model-calls${qs({ ...f })}`),
+  cost: () => apiFetch<CostPanelOut>("/admin/observability/cost"),
+};
+
+export const adminEvals = {
+  versions: () => apiFetch<ModelVersionRow[]>("/admin/evals/versions"),
+  runs: (suite?: string) => apiFetch<EvalRunRow[]>(`/admin/evals/runs${qs({ suite })}`),
+  regression: () => apiFetch<RegressionOut>("/admin/evals/regression"),
+  cases: (modelVersion?: string) => apiFetch<{ items: EvalCaseRow[] }>(`/admin/evals/cases${qs({ model_version: modelVersion })}`),
+  scoreVersions: () => apiFetch<string[]>("/admin/evals/score-versions"),
+  compare: (a: string, b: string) => apiFetch<CompareOut>(`/admin/evals/compare${qs({ version_a: a, version_b: b })}`),
+  speech: () => apiFetch<EvalRunRow[]>("/admin/evals/speech"),
+  promote: (candidateVersionId: string) =>
+    apiFetch<unknown>("/admin/registry/promote", { method: "POST", body: { candidate_version_id: candidateVersionId } }),
+  rollback: (targetVersionId: string) =>
+    apiFetch<unknown>("/admin/registry/rollback", { method: "POST", body: { target_version_id: targetVersionId } }),
 };

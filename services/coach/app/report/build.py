@@ -61,9 +61,7 @@ def _find_preceding_question(
     (the scenario's `opening_strategy`) covers the first exchange, before any persona turn has
     been persisted — Task 2.3f's scripted opening will change this once it exists."""
     candidates = [
-        t
-        for t in turns
-        if t["speaker"] == "persona" and int(t["index"]) < int(user_turn["index"])
+        t for t in turns if t["speaker"] == "persona" and int(t["index"]) < int(user_turn["index"])
     ]
     if not candidates:
         return fallback
@@ -177,9 +175,7 @@ async def score_turn(ctx: dict[str, Any], *, session_id: str, turn_id: str) -> N
                 cached=stats.cached,
             )
 
-    await maybe_run_shadow_scoring(
-        sid, tid, question=question, answer=answer, criteria=criteria
-    )
+    await maybe_run_shadow_scoring(sid, tid, question=question, answer=answer, criteria=criteria)
 
     logger.info(
         "score_turn_complete",

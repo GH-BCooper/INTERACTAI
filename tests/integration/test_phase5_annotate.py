@@ -98,12 +98,20 @@ async def _seed_labelable_turn(
     )
 
     persona_turn = Turn(
-        session_id=session.id, index=0, speaker="persona", text="Tell me about a project.",
-        start_ms=0, end_ms=0,
+        session_id=session.id,
+        index=0,
+        speaker="persona",
+        text="Tell me about a project.",
+        start_ms=0,
+        end_ms=0,
     )
     user_turn = Turn(
-        session_id=session.id, index=1, speaker="user", text="I built a caching layer.",
-        start_ms=0, end_ms=5000,
+        session_id=session.id,
+        index=1,
+        speaker="user",
+        text="I built a caching layer.",
+        start_ms=0,
+        end_ms=5000,
     )
     db_session.add(persona_turn)
     db_session.add(user_turn)
@@ -179,9 +187,20 @@ class TestQueueContract:
         resp = await app_client.get("/admin/annotate/queue", headers=_auth_headers(admin))
         item = resp.json()[0]
         assert set(item.keys()) == {
-            "turn_id", "session_id", "question", "answer_text", "answer_is_scrubbed",
-            "audio_url", "audio_start_ms", "audio_end_ms", "criterion_key", "criterion_name",
-            "anchor_descriptors", "split", "double_labeled", "pre_label_score",
+            "turn_id",
+            "session_id",
+            "question",
+            "answer_text",
+            "answer_is_scrubbed",
+            "audio_url",
+            "audio_start_ms",
+            "audio_end_ms",
+            "criterion_key",
+            "criterion_name",
+            "anchor_descriptors",
+            "split",
+            "double_labeled",
+            "pre_label_score",
         }
         assert item["pre_label_score"] is None  # validation split: never pre-labelled
 

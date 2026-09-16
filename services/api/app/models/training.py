@@ -115,12 +115,8 @@ class EvalRun(UUIDPk, TimestampMixin, Base):
     __tablename__ = "eval_runs"
     __table_args__ = (
         CheckConstraint(sql_in("split", EVAL_RUN_SPLITS), name="ck_eval_runs_split"),
-        CheckConstraint(
-            "qwk IS NULL OR qwk BETWEEN -1 AND 1", name="ck_eval_runs_qwk_range"
-        ),
-        CheckConstraint(
-            "ece IS NULL OR ece BETWEEN 0 AND 1", name="ck_eval_runs_ece_range"
-        ),
+        CheckConstraint("qwk IS NULL OR qwk BETWEEN -1 AND 1", name="ck_eval_runs_qwk_range"),
+        CheckConstraint("ece IS NULL OR ece BETWEEN 0 AND 1", name="ck_eval_runs_ece_range"),
         CheckConstraint(
             "adjacent_accuracy IS NULL OR adjacent_accuracy BETWEEN 0 AND 1",
             name="ck_eval_runs_adjacent_accuracy_range",
@@ -152,6 +148,10 @@ class EvalRun(UUIDPk, TimestampMixin, Base):
         Text, ForeignKey("dataset_revisions.hash", ondelete="RESTRICT"), nullable=False
     )
     split: Mapped[str] = mapped_column(Text, nullable=False)
+    # Phase 6 TASK 6.3: Level 1 (speech) and Level 2 (persona) suites report metrics that are not
+    # kappa columns — WER, RTF, endpoint precision/recall, character-break rate... — by name.
+    metrics: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False, default=dict)
+    host_class: Mapped[str | None] = mapped_column(Text)
     # Task 5.5b: "The harness must refuse to evaluate on the reporting split unless explicitly
     # flagged --publish, and it logs every such access." True the moment this row came from a
     # --publish invocation touching the reporting (test) split.

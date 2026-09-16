@@ -115,9 +115,7 @@ async def load_examples(
     turns_result = await db.execute(select(Turn).where(Turn.id.in_(turn_ids)))
     turns_by_id = {t.id: t for t in turns_result.scalars().all()}
 
-    metrics_result = await db.execute(
-        select(TurnMetrics).where(TurnMetrics.turn_id.in_(turn_ids))
-    )
+    metrics_result = await db.execute(select(TurnMetrics).where(TurnMetrics.turn_id.in_(turn_ids)))
     metrics_by_turn_id = {m.turn_id: m for m in metrics_result.scalars().all()}
 
     annotations_result = await db.execute(
@@ -149,9 +147,7 @@ async def load_examples(
                 source="turn_metrics",
             )
         else:
-            features = DeterministicFeatures.from_text_fallback(
-                answer, turn.end_ms - turn.start_ms
-            )
+            features = DeterministicFeatures.from_text_fallback(answer, turn.end_ms - turn.start_ms)
 
         criterion_scores = {
             key: sum(vals) / len(vals) for key, vals in scores_by_turn.get(turn.id, {}).items()

@@ -30,10 +30,7 @@ class MultiCriterionScorer(nn.Module):
         hidden_size = self.encoder.config.hidden_size
         self.dropout = nn.Dropout(0.1)
         self.heads = nn.ModuleDict(
-            {
-                criterion: nn.Linear(hidden_size + N_AUX_FEATURES, 1)
-                for criterion in criteria
-            }
+            {criterion: nn.Linear(hidden_size + N_AUX_FEATURES, 1) for criterion in criteria}
         )
 
     def forward(

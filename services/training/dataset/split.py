@@ -142,9 +142,7 @@ def enforce_synthetic_cap(assignments: list[SplitAssignment]) -> list[SplitAssig
     TASK 5.2b warns against ("does not learn 'the synthetic style' as a shortcut feature").
     """
     train = [a for a in assignments if a.split == "train"]
-    synthetic_train = sorted(
-        (a for a in train if a.source == "synthetic"), key=lambda a: a.turn_id
-    )
+    synthetic_train = sorted((a for a in train if a.source == "synthetic"), key=lambda a: a.turn_id)
     real_train_count = sum(1 for a in train if a.source != "synthetic")
     if real_train_count == 0:
         max_synthetic = 0
@@ -189,9 +187,7 @@ def mark_double_labeled(
     ]
 
 
-def compute_dataset_revision_hash(
-    assignments: list[SplitAssignment], label_ids: list[str]
-) -> str:
+def compute_dataset_revision_hash(assignments: list[SplitAssignment], label_ids: list[str]) -> str:
     """TASK 5.2d: "Every build produces a content hash over (turn_ids, label_ids, split
     assignment)." Sorted, canonical JSON so the same inputs always hash identically regardless
     of query/iteration order (TASK 5.2d's own acceptance criterion: "reproducible across two

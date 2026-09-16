@@ -79,9 +79,7 @@ async def get_rubric(db: AsyncSession, rubric_id: std_uuid.UUID) -> dict[str, An
     return dict(row) if row is not None else None
 
 
-async def get_rubric_criteria(
-    db: AsyncSession, rubric_id: std_uuid.UUID
-) -> list[dict[str, Any]]:
+async def get_rubric_criteria(db: AsyncSession, rubric_id: std_uuid.UUID) -> list[dict[str, Any]]:
     result = await db.execute(
         select(rubric_criteria)
         .where(rubric_criteria.c.rubric_id == rubric_id)

@@ -38,7 +38,7 @@ class TestSplitRecentAndOlder:
         assert len(older) == 10 - RECENT_TURNS_VERBATIM
         assert len(recent) == RECENT_TURNS_VERBATIM
         assert recent == history[-RECENT_TURNS_VERBATIM:]
-        assert older == history[: -RECENT_TURNS_VERBATIM]
+        assert older == history[:-RECENT_TURNS_VERBATIM]
 
 
 class TestSummarizeHistory:

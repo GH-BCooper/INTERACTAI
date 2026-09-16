@@ -149,7 +149,5 @@ async def deliver_opening_line(
         await sink.send_state_change("idle", turn_id=turn_id)
     else:
         await sink.send_degraded("tts", "Opening line could not be synthesized.", True)
-        await sink.send_state_change(
-            "degraded", turn_id=turn_id, component="tts", recoverable=True
-        )
+        await sink.send_state_change("degraded", turn_id=turn_id, component="tts", recoverable=True)
         await sink.send_state_change("idle", turn_id=turn_id)

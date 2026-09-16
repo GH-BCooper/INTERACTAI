@@ -199,9 +199,7 @@ def main() -> int:
     for i in range(60):
         voice = rng.choice(VOICES)
         seg = pick(CLEAN_ENDINGS, voice)
-        items.append(
-            _build_item(f"clean_{i:03d}", [seg], "clean_definitive_end", f"voice={voice}")
-        )
+        items.append(_build_item(f"clean_{i:03d}", [seg], "clean_definitive_end", f"voice={voice}"))
 
     # 2. Mid-sentence thinking pauses — NOT the true end; true end is after the continuation (50).
     gap_choices = [400, 600, 800, 1000, 1500]

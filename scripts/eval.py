@@ -127,8 +127,13 @@ def evaluate(
 
     if not all_true:
         return {
-            "qwk": None, "mae": None, "spearman": None, "adjacent_accuracy": None, "ece": None,
-            "per_criterion": per_criterion, "n": 0,
+            "qwk": None,
+            "mae": None,
+            "spearman": None,
+            "adjacent_accuracy": None,
+            "ece": None,
+            "per_criterion": per_criterion,
+            "n": 0,
         }
     all_true_rounded = [round(t) for t in all_true]
     all_pred_rounded = [min(5, max(1, round(p))) for p in all_pred]

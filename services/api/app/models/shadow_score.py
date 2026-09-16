@@ -26,7 +26,9 @@ class ShadowScore(UUIDPk, TimestampMixin, Base):
     __tablename__ = "shadow_scores"
     __table_args__ = (
         UniqueConstraint(
-            "turn_id", "criterion_key", "model_version",
+            "turn_id",
+            "criterion_key",
+            "model_version",
             name="uq_shadow_scores_turn_criterion_model",
         ),
         CheckConstraint(

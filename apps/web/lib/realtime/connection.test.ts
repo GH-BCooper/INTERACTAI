@@ -120,6 +120,16 @@ describe("RealtimeConnection", () => {
     expect(sockets.length).toBe(1); // never attempted a second connection
   });
 
+  it("treats a 4429 capacity rejection as terminal at_capacity, never a retry loop", async () => {
+    const { conn, statuses } = makeConnection();
+    await conn.connect();
+    sockets[0]!.simulateClose(4429, "RATE_LIMITED");
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(statuses.at(-1)).toBe("at_capacity");
+    expect(sockets.length).toBe(1);
+  });
+
   it("does not confuse a 4409 token-reuse close with session_busy", async () => {
     const { conn, statuses } = makeConnection();
     await conn.connect();

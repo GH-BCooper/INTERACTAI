@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     web_origin: str = "http://localhost:3000"
 
     max_concurrent_sessions: int = 4
+    # Phase 6 TASK 6.4b: upper bound on SIGTERM drain. Must be below the orchestrator's kill
+    # grace period (docker stop default 10s is too short — compose sets stop_grace_period 45s).
+    shutdown_drain_timeout_s: float = 30.0
+    # Phase 6 TASK 6.1a/6.3a: every latency event and speech-suite run is tagged with the host it
+    # ran on, e.g. "dev-laptop-cpu", "hf-spaces-cpu-basic". Percentiles only compare within one.
+    host_class: str = "unspecified"
 
     # ── Recording storage (Task 1.1/1.2c: "upload the recording") ───────────────
     s3_endpoint: str = ""

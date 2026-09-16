@@ -131,3 +131,8 @@ tmp/
 *.orig
 *.rej
 *.bak
+
+# Phase 6: raw demo-recording captures and eval transcripts (regenerable; the exported demo bundle
+# under apps/web/public/demo is what is committed, per TASK 6.5).
+/data/demo_raw/
+/data/eval/

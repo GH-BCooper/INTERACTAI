@@ -137,6 +137,7 @@ export function useRealtimeSocket(sessionId: string): UseRealtimeSocket {
             open: "connected",
             reconnecting: "reconnecting",
             session_busy: "session_busy",
+            at_capacity: "at_capacity",
             closed: "ended",
             fatal_error: "ended",
           } as const;

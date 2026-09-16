@@ -30,7 +30,7 @@ class TestLocateQuote:
         assert ANSWER[span.start : span.end] == "rebuilt the ingestion pipeline"
 
     def test_paraphrase_is_not_located(self) -> None:
-        """"Paraphrase matching is not [permitted]" — a semantically-equivalent but
+        """ "Paraphrase matching is not [permitted]" — a semantically-equivalent but
         textually-different quote must not resolve to a span at all."""
         assert locate_quote(ANSWER, "revamped the data ingestion system") is None
 

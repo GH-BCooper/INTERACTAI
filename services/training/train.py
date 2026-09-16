@@ -118,8 +118,12 @@ def evaluate(
 
     if not all_true:
         return {
-            "qwk": None, "mae": None, "spearman": None, "adjacent_accuracy": None,
-            "per_criterion": per_criterion, "n": 0,
+            "qwk": None,
+            "mae": None,
+            "spearman": None,
+            "adjacent_accuracy": None,
+            "per_criterion": per_criterion,
+            "n": 0,
         }
 
     all_true_rounded = [round(t) for t in all_true]
@@ -165,9 +169,7 @@ async def run_finetune_seed(
 
     def _encode_batch(batch: list[TrainingExample]) -> dict[str, torch.Tensor]:
         texts = [f"{ex.question} [SEP] {ex.answer}" for ex in batch]
-        enc = tokenizer(
-            texts, truncation=True, max_length=512, padding=True, return_tensors="pt"
-        )
+        enc = tokenizer(texts, truncation=True, max_length=512, padding=True, return_tensors="pt")
         aux = torch.tensor(
             [make_aux_features(ex.features.duration_ms, ex.features.word_count) for ex in batch],
             dtype=torch.float32,
@@ -376,12 +378,15 @@ async def main_async(args: argparse.Namespace) -> None:
                             target_by_criterion[criterion].append(ex.scores[criterion])
                 if raw_by_criterion:
                     calibration_models = fit_isotonic_per_criterion(
-                        dict(raw_by_criterion), dict(target_by_criterion),
-                        split="validation", guard=guard,
+                        dict(raw_by_criterion),
+                        dict(target_by_criterion),
+                        split="validation",
+                        guard=guard,
                     )
                     calibrated_val_raw = {
                         c: [ensemble_val[ex.turn_id][c] for ex in val if ex.turn_id in ensemble_val]
-                        for c in criteria if c in raw_by_criterion
+                        for c in criteria
+                        if c in raw_by_criterion
                     }
                     calibrated = apply_calibration(calibration_models, calibrated_val_raw)
                     calibrated_predictions: dict[str, dict[str, float]] = defaultdict(dict)

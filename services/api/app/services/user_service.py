@@ -77,6 +77,17 @@ async def find_or_link_or_create_oauth_user(
     return user
 
 
+async def get_or_create_local_user(db: AsyncSession, *, email: str) -> User:
+    """Phase 6 TASK 6.4d: the single self-host account (routers/auth.py::local_login)."""
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = User(email=email, email_verified=True, name="Local user")
+        db.add(user)
+        await db.flush()
+    return user
+
+
 async def update_profile(
     db: AsyncSession,
     user_id: std_uuid.UUID,

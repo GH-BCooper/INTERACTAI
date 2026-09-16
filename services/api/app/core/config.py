@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     github_client_secret: str = ""
     google_client_id: str = ""
     google_client_secret: str = ""
+    # Phase 6 TASK 6.4d (AS-12): self-host with zero external keys means no OAuth app. This
+    # enables GET /auth/local/login — one local account, no password. Refused in production.
+    self_host_local_login: bool = False
 
     max_concurrent_sessions: int = 4
     max_sessions_per_hour: int = 10

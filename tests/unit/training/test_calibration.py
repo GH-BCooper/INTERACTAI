@@ -39,8 +39,10 @@ def test_fitting_on_test_raises_even_with_valid_train_data_alongside() -> None:
     fire per-call, not just be bypassable by calling fit() directly on later criteria."""
     guard = CalibrationGuard()
     fit_isotonic_per_criterion(
-        {"structure": [1.0, 2.0, 3.0]}, {"structure": [1.0, 2.0, 3.0]},
-        split="validation", guard=guard,
+        {"structure": [1.0, 2.0, 3.0]},
+        {"structure": [1.0, 2.0, 3.0]},
+        split="validation",
+        guard=guard,
     )
     with pytest.raises(ForbiddenSplitFitError):
         fit_isotonic_per_criterion(

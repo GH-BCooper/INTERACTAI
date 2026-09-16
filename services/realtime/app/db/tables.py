@@ -73,6 +73,9 @@ turns = Table(
     Column("word_timings", JSONB, nullable=False),
     Column("truncated", Boolean, nullable=False),
     Column("asr_confidence", Float),
+    # NOT NULL since Phase 4 (consent-revocation cascade). Realtime writes it explicitly: a
+    # missing value failed every live turn insert (tests/integration/test_realtime_turn_insert.py).
+    Column("training_excluded", Boolean, nullable=False),
 )
 
 turn_metrics = Table(
@@ -101,6 +104,7 @@ latency_events = Table(
     Column("turn_id", PGUUID(as_uuid=True), nullable=False),
     Column("stage", Text, nullable=False),
     Column("duration_ms", Float, nullable=False),
+    Column("host_class", Text, nullable=True),
 )
 
 model_calls = Table(

@@ -21,10 +21,13 @@ export function ReportHeader({
   session,
   scenario,
   scores,
+  readOnly = false,
 }: {
   session: SessionOut;
   scenario: ScenarioOut | undefined;
   scores: SessionScoreOut[];
+  /** Phase 6 TASK 6.5: the public /demo renders this same header with no account behind it. */
+  readOnly?: boolean;
 }) {
   const [showPractiseAgain, setShowPractiseAgain] = useState(false);
 
@@ -65,6 +68,7 @@ export function ReportHeader({
             <ScoreBadge score={overall} />
           </div>
         </div>
+        {!readOnly && (
         <div className="flex flex-wrap gap-2">
           {scenario && (
             <Button variant="primary" size="sm" onClick={() => setShowPractiseAgain(true)}>
@@ -81,6 +85,7 @@ export function ReportHeader({
             Delete recording
           </Button>
         </div>
+        )}
       </div>
 
       {showPractiseAgain && scenario && (

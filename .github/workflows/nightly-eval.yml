@@ -1,0 +1,104 @@
+name: Nightly evaluation
+
+# Phase 6 TASK 6.3c (OE-13): all three evaluation levels, every night, against main. A regression
+# is caught by the repository, not by a user — a failing suite opens (or updates) an issue.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  UV_VERSION: "0.9"
+  HOST_CLASS: github-ubuntu-latest-cpu
+  DATABASE_URL: postgresql+asyncpg://interactai:interactai@localhost:5432/interactai
+  REDIS_URL: redis://localhost:6379/0
+  JWT_SECRET: nightly-eval-jwt-secret-not-used-for-auth
+  WS_TOKEN_SECRET: nightly-eval-ws-secret-not-used-for-auth
+  APP_SECRET: nightly-eval-app-secret-not-used-for-auth
+  PIPER_VOICE_DIR: models/piper
+  VAD_MODEL_PATH: models/vad/silero_vad.onnx
+  GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: interactai
+          POSTGRES_PASSWORD: interactai
+          POSTGRES_DB: interactai
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U interactai" --health-interval 5s --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --all-packages
+      - name: Fetch model weights (never committed)
+        run: uv run python deploy/fetch_models.py
+      - run: uv run --directory services/api alembic upgrade head
+      - run: uv run python scripts/seed.py
+
+      - name: Level 1 — speech components
+        id: speech
+        continue-on-error: true
+        run: uv run python scripts/eval_speech.py
+
+      - name: Level 2 — persona adherence
+        id: persona
+        continue-on-error: true
+        run: |
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "::error::GROQ_API_KEY secret is not set; Level 2 cannot run and is reported as failed."
+            exit 1
+          fi
+          uv run python scripts/eval_persona.py --skip-safety
+
+      - name: Level 3 — scorer agreement
+        id: scorer
+        continue-on-error: true
+        run: uv run python scripts/eval.py
+
+      - name: Post metrics to the run summary
+        if: always()
+        run: uv run python scripts/publish_metrics.py --markdown >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep transcripts and metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-eval-${{ github.run_id }}
+          path: data/eval/
+          if-no-files-found: ignore
+
+      - name: Open an issue on regression
+        if: steps.speech.outcome == 'failure' || steps.persona.outcome == 'failure' || steps.scorer.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Nightly evaluation failed ($(date -u +%F))"
+          body="speech: ${{ steps.speech.outcome }} · persona: ${{ steps.persona.outcome }} · scorer: ${{ steps.scorer.outcome }}
+
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          existing=$(gh issue list --label nightly-eval --state open --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh label create nightly-eval --color B60205 --force
+            gh issue create --title "$title" --body "$body" --label nightly-eval
+          fi
+          exit 1

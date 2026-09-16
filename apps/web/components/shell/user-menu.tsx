@@ -37,7 +37,7 @@ export function UserMenu({ me }: { me: MeOut }) {
       await fetch(`${API_BASE_URL}/auth/logout`, { method: "POST", credentials: "include" });
     } finally {
       clearAuth();
-      router.replace("/");
+      router.replace("/signin");
     }
   }
 

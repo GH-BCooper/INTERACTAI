@@ -134,9 +134,7 @@ async def seed_dev_fixtures(db: AsyncSession) -> None:
 
 
 async def _delete_existing_fixtures(db: AsyncSession) -> None:
-    result = await db.execute(
-        select(User.id).where(User.email.like(f"%@{FIXTURE_EMAIL_DOMAIN}"))
-    )
+    result = await db.execute(select(User.id).where(User.email.like(f"%@{FIXTURE_EMAIL_DOMAIN}")))
     user_ids = [row[0] for row in result.all()]
     if not user_ids:
         return

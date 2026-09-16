@@ -1,0 +1,1912 @@
+{
+ "provenance": {
+  "session_id": "01a0ac0d-a66e-7f53-ba73-bd2dec3b19fd",
+  "recorded_at": "2026-09-16T21:09:30.829831+00:00",
+  "exported_at": "2026-09-16T21:12:59.693811+00:00",
+  "host_class": "dev-laptop-cpu",
+  "persona_model": "groq/openai/gpt-oss-20b",
+  "scorer_model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0",
+  "voices": {
+   "user": "Piper en_GB-alan-medium (scripted answers, synthesized)",
+   "persona": "Piper en_US-lessac-medium (live pipeline)"
+  },
+  "note": "Recorded through the real realtime service and scored by the real coach worker. The user's answers are scripted and synthesized; nothing else was edited."
+ },
+ "session": {
+  "id": "01a0ac0d-a66e-7f53-ba73-bd2dec3b19fd",
+  "scenario_id": "01a01bef-7820-7240-9941-3ce509b2bc03",
+  "status": "closed",
+  "end_reason": "user_hangup",
+  "target_minutes": 5,
+  "focus_areas": [],
+  "started_at": null,
+  "ended_at": "2026-09-16T21:10:56.375479Z",
+  "duration_ms": 82417,
+  "created_at": "2026-09-16T21:09:30.829831Z",
+  "recording_available": true,
+  "retry_of_session_id": null,
+  "retry_of_turn_id": null
+ },
+ "scenario": {
+  "id": "01a01bef-7820-7240-9941-3ce509b2bc03",
+  "slug": "behavioural-standard",
+  "family": "behavioural",
+  "difficulty": "standard",
+  "title": "Behavioural / STAR screen \u2014 standard",
+  "brief": "You are the hiring manager for a senior engineer opening on your team, running the\nbehavioural round after the candidate already passed a technical screen. You are deciding\nwhether this person will make your team better under real conditions \u2014 a missed deadline, a\ndisagreement with a PM, a production incident. You ask each question once, listen without\ninterrupting, and take a beat before responding either way. If an answer stays abstract\n(\"we worked together to fix it\") you will ask exactly one follow-up for specifics \u2014 who did\nwhat, what the actual decision was \u2014 and then move on regardless of what you get back. You\ndo not tell candidates how they're doing.\n",
+  "opening_strategy": "Open by stating this is the behavioural round and you'll ask a few questions about how they\nwork with others. Ask about a time they had to push back on a decision they disagreed with.\n",
+  "duration_minutes": 30,
+  "tags": [
+   "behavioural",
+   "star"
+  ],
+  "persona_id": "01a01bef-77a5-7093-974b-72f640da5d23",
+  "rubric_id": "01a01bef-77ad-7f01-a859-0e9ac92ee72c"
+ },
+ "turns": [
+  {
+   "id": "01a0ac0d-b4e4-7612-ae50-18a53e92e525",
+   "index": -1,
+   "speaker": "persona",
+   "text": "Thanks for coming in",
+   "text_scrubbed": "Thanks for coming in",
+   "start_ms": 1669,
+   "end_ms": 2876,
+   "word_timings": [],
+   "truncated": false,
+   "asr_confidence": null,
+   "metrics": null,
+   "scores": []
+  },
+  {
+   "id": "01a0ac0d-e9e4-7ac2-b69e-e9a4c55ee660",
+   "index": 0,
+   "speaker": "user",
+   "text": "I guess there was a project where people didn't agree. We talked about it a lot and it sort of worked out",
+   "text_scrubbed": "I guess there was a project where people didn't agree. We talked about it a lot and it sort of worked out",
+   "start_ms": 4143,
+   "end_ms": 11390,
+   "word_timings": [
+    {
+     "word": "I",
+     "start_ms": 0,
+     "end_ms": 440
+    },
+    {
+     "word": "guess",
+     "start_ms": 440,
+     "end_ms": 660
+    },
+    {
+     "word": "there",
+     "start_ms": 660,
+     "end_ms": 960
+    },
+    {
+     "word": "was",
+     "start_ms": 960,
+     "end_ms": 1100
+    },
+    {
+     "word": "a",
+     "start_ms": 1100,
+     "end_ms": 1260
+    },
+    {
+     "word": "project",
+     "start_ms": 1260,
+     "end_ms": 1600
+    },
+    {
+     "word": "where",
+     "start_ms": 1600,
+     "end_ms": 1980
+    },
+    {
+     "word": "people",
+     "start_ms": 1980,
+     "end_ms": 2240
+    },
+    {
+     "word": "didn't",
+     "start_ms": 2240,
+     "end_ms": 2840
+    },
+    {
+     "word": "agree.",
+     "start_ms": 2840,
+     "end_ms": 3120
+    },
+    {
+     "word": "We",
+     "start_ms": 3720,
+     "end_ms": 3820
+    },
+    {
+     "word": "talked",
+     "start_ms": 3820,
+     "end_ms": 4040
+    },
+    {
+     "word": "about",
+     "start_ms": 4040,
+     "end_ms": 4400
+    },
+    {
+     "word": "it",
+     "start_ms": 4400,
+     "end_ms": 4620
+    },
+    {
+     "word": "a",
+     "start_ms": 4620,
+     "end_ms": 4740
+    },
+    {
+     "word": "lot",
+     "start_ms": 4740,
+     "end_ms": 4940
+    },
+    {
+     "word": "and",
+     "start_ms": 4940,
+     "end_ms": 5420
+    },
+    {
+     "word": "it",
+     "start_ms": 5420,
+     "end_ms": 5560
+    },
+    {
+     "word": "sort",
+     "start_ms": 5560,
+     "end_ms": 5800
+    },
+    {
+     "word": "of",
+     "start_ms": 5800,
+     "end_ms": 6080
+    },
+    {
+     "word": "worked",
+     "start_ms": 6080,
+     "end_ms": 6320
+    },
+    {
+     "word": "out",
+     "start_ms": 6320,
+     "end_ms": 6680
+    }
+   ],
+   "truncated": false,
+   "asr_confidence": 0.8355514191089816,
+   "metrics": {
+    "wpm": 122.61960055736182,
+    "filler_count": 1,
+    "filler_rate": 0.045454545454545456,
+    "longest_pause_ms": 8428,
+    "speech_ratio": 0.5647933116581514,
+    "word_count": 22
+   },
+   "scores": [
+    {
+     "criterion_key": "delivery",
+     "score": 5,
+     "confidence": 1.0,
+     "evidence_spans": [],
+     "model_version": "deterministic-v1"
+    },
+    {
+     "criterion_key": "structure",
+     "score": 4,
+     "confidence": 0.7,
+     "evidence_spans": [
+      {
+       "end": 105,
+       "start": 0
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "specificity",
+     "score": 1,
+     "confidence": 0.8355514191089816,
+     "evidence_spans": [
+      {
+       "end": 105,
+       "start": 0
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "relevance",
+     "score": 1,
+     "confidence": 0.8355514191089816,
+     "evidence_spans": [
+      {
+       "end": 105,
+       "start": 0
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "concision",
+     "score": 5,
+     "confidence": 0.8355514191089816,
+     "evidence_spans": [
+      {
+       "end": 105,
+       "start": 0
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "confidence",
+     "score": 2,
+     "confidence": 0.8355514191089816,
+     "evidence_spans": [
+      {
+       "end": 7,
+       "start": 0
+      },
+      {
+       "end": 105,
+       "start": 87
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "technical_depth",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "tradeoff_reasoning",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    }
+   ]
+  },
+  {
+   "id": "01a0ac0d-f3bc-7771-bd42-17e0a2f9b232",
+   "index": 0,
+   "speaker": "persona",
+   "text": "Sure, this is our behavioural",
+   "text_scrubbed": "Sure, this is our behavioural",
+   "start_ms": 17632,
+   "end_ms": 19315,
+   "word_timings": [],
+   "truncated": false,
+   "asr_confidence": null,
+   "metrics": null,
+   "scores": []
+  },
+  {
+   "id": "01a0ac0e-30b1-7781-b32e-95f0b168765b",
+   "index": 1,
+   "speaker": "user",
+   "text": "right so it was with another engineer and there were meetings and the deadline moved. I don't really remember how it ended.",
+   "text_scrubbed": "right so it was with another engineer and there were meetings and the deadline moved. I don't really remember how it ended.",
+   "start_ms": 20585,
+   "end_ms": 28877,
+   "word_timings": [
+    {
+     "word": "right",
+     "start_ms": 0,
+     "end_ms": 180
+    },
+    {
+     "word": "so",
+     "start_ms": 180,
+     "end_ms": 500
+    },
+    {
+     "word": "it",
+     "start_ms": 500,
+     "end_ms": 680
+    },
+    {
+     "word": "was",
+     "start_ms": 680,
+     "end_ms": 880
+    },
+    {
+     "word": "with",
+     "start_ms": 880,
+     "end_ms": 1120
+    },
+    {
+     "word": "another",
+     "start_ms": 1120,
+     "end_ms": 1380
+    },
+    {
+     "word": "engineer",
+     "start_ms": 1380,
+     "end_ms": 1900
+    },
+    {
+     "word": "and",
+     "start_ms": 1900,
+     "end_ms": 2580
+    },
+    {
+     "word": "there",
+     "start_ms": 2580,
+     "end_ms": 2820
+    },
+    {
+     "word": "were",
+     "start_ms": 2820,
+     "end_ms": 2960
+    },
+    {
+     "word": "meetings",
+     "start_ms": 2960,
+     "end_ms": 3340
+    },
+    {
+     "word": "and",
+     "start_ms": 3340,
+     "end_ms": 4020
+    },
+    {
+     "word": "the",
+     "start_ms": 4020,
+     "end_ms": 4200
+    },
+    {
+     "word": "deadline",
+     "start_ms": 4200,
+     "end_ms": 4420
+    },
+    {
+     "word": "moved.",
+     "start_ms": 4420,
+     "end_ms": 5060
+    },
+    {
+     "word": "I",
+     "start_ms": 5800,
+     "end_ms": 5880
+    },
+    {
+     "word": "don't",
+     "start_ms": 5880,
+     "end_ms": 6220
+    },
+    {
+     "word": "really",
+     "start_ms": 6220,
+     "end_ms": 6420
+    },
+    {
+     "word": "remember",
+     "start_ms": 6420,
+     "end_ms": 6840
+    },
+    {
+     "word": "how",
+     "start_ms": 6840,
+     "end_ms": 7260
+    },
+    {
+     "word": "it",
+     "start_ms": 7260,
+     "end_ms": 7400
+    },
+    {
+     "word": "ended.",
+     "start_ms": 7400,
+     "end_ms": 7820
+    }
+   ],
+   "truncated": false,
+   "asr_confidence": 0.7600741712726009,
+   "metrics": {
+    "wpm": 105.60000000000001,
+    "filler_count": 0,
+    "filler_rate": 0.0,
+    "longest_pause_ms": 25413,
+    "speech_ratio": 0.5664,
+    "word_count": 22
+   },
+   "scores": [
+    {
+     "criterion_key": "delivery",
+     "score": 5,
+     "confidence": 1.0,
+     "evidence_spans": [],
+     "model_version": "deterministic-v1"
+    },
+    {
+     "criterion_key": "structure",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "specificity",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "relevance",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "concision",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "confidence",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "technical_depth",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "tradeoff_reasoning",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    }
+   ]
+  },
+  {
+   "id": "01a0ac0e-3df8-7e22-ad73-0485c6d0d0ef",
+   "index": 1,
+   "speaker": "persona",
+   "text": "Who was that engineer, and what specific decision did you push back on?",
+   "text_scrubbed": "Who was that engineer, and what specific decision did you push back on?",
+   "start_ms": 35882,
+   "end_ms": 39539,
+   "word_timings": [],
+   "truncated": false,
+   "asr_confidence": null,
+   "metrics": null,
+   "scores": []
+  },
+  {
+   "id": "01a0ac0e-9e38-7b02-8942-0d25f3a6b404",
+   "index": 2,
+   "speaker": "user",
+   "text": "Okay, specifically. Checkout was timing out. I profiled it, found one unindexed query, added the index, and P95 dropped from 2 seconds to 300 milliseconds.",
+   "text_scrubbed": "Okay, specifically. Checkout was timing out. I profiled it, found one unindexed query, added the index, and [ORG_1] dropped from 2 seconds to 300 milliseconds.",
+   "start_ms": 40835,
+   "end_ms": 54389,
+   "word_timings": [
+    {
+     "word": "Okay,",
+     "start_ms": 0,
+     "end_ms": 240
+    },
+    {
+     "word": "specifically.",
+     "start_ms": 480,
+     "end_ms": 1060
+    },
+    {
+     "word": "Checkout",
+     "start_ms": 2000,
+     "end_ms": 2280
+    },
+    {
+     "word": "was",
+     "start_ms": 2280,
+     "end_ms": 2540
+    },
+    {
+     "word": "timing",
+     "start_ms": 2540,
+     "end_ms": 2880
+    },
+    {
+     "word": "out.",
+     "start_ms": 2880,
+     "end_ms": 3280
+    },
+    {
+     "word": "I",
+     "start_ms": 4040,
+     "end_ms": 4120
+    },
+    {
+     "word": "profiled",
+     "start_ms": 4120,
+     "end_ms": 4720
+    },
+    {
+     "word": "it,",
+     "start_ms": 4720,
+     "end_ms": 4940
+    },
+    {
+     "word": "found",
+     "start_ms": 5200,
+     "end_ms": 5320
+    },
+    {
+     "word": "one",
+     "start_ms": 5320,
+     "end_ms": 5720
+    },
+    {
+     "word": "unindexed",
+     "start_ms": 5720,
+     "end_ms": 6500
+    },
+    {
+     "word": "query,",
+     "start_ms": 6500,
+     "end_ms": 6720
+    },
+    {
+     "word": "added",
+     "start_ms": 7220,
+     "end_ms": 7320
+    },
+    {
+     "word": "the",
+     "start_ms": 7320,
+     "end_ms": 7580
+    },
+    {
+     "word": "index,",
+     "start_ms": 7580,
+     "end_ms": 7900
+    },
+    {
+     "word": "and",
+     "start_ms": 8540,
+     "end_ms": 8640
+    },
+    {
+     "word": "P95",
+     "start_ms": 8640,
+     "end_ms": 9380
+    },
+    {
+     "word": "dropped",
+     "start_ms": 9380,
+     "end_ms": 10040
+    },
+    {
+     "word": "from",
+     "start_ms": 10040,
+     "end_ms": 10420
+    },
+    {
+     "word": "2",
+     "start_ms": 10420,
+     "end_ms": 10700
+    },
+    {
+     "word": "seconds",
+     "start_ms": 10700,
+     "end_ms": 11100
+    },
+    {
+     "word": "to",
+     "start_ms": 11100,
+     "end_ms": 11440
+    },
+    {
+     "word": "300",
+     "start_ms": 11440,
+     "end_ms": 11800
+    },
+    {
+     "word": "milliseconds.",
+     "start_ms": 11800,
+     "end_ms": 12540
+    }
+   ],
+   "truncated": false,
+   "asr_confidence": 0.7678106324799496,
+   "metrics": {
+    "wpm": 74.07407407407408,
+    "filler_count": 0,
+    "filler_rate": 0.0,
+    "longest_pause_ms": 48724,
+    "speech_ratio": 0.454320987654321,
+    "word_count": 25
+   },
+   "scores": [
+    {
+     "criterion_key": "delivery",
+     "score": 4,
+     "confidence": 1.0,
+     "evidence_spans": [],
+     "model_version": "deterministic-v1"
+    },
+    {
+     "criterion_key": "structure",
+     "score": 5,
+     "confidence": 0.7678106324799496,
+     "evidence_spans": [
+      {
+       "end": 155,
+       "start": 20
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "specificity",
+     "score": 5,
+     "confidence": 0.7678106324799496,
+     "evidence_spans": [
+      {
+       "end": 155,
+       "start": 20
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "relevance",
+     "score": 1,
+     "confidence": 0.7678106324799496,
+     "evidence_spans": [
+      {
+       "end": 155,
+       "start": 20
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "concision",
+     "score": 5,
+     "confidence": 0.7678106324799496,
+     "evidence_spans": [
+      {
+       "end": 155,
+       "start": 20
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "confidence",
+     "score": 5,
+     "confidence": 0.7678106324799496,
+     "evidence_spans": [
+      {
+       "end": 155,
+       "start": 20
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "technical_depth",
+     "score": 2,
+     "confidence": 0.7678106324799496,
+     "evidence_spans": [
+      {
+       "end": 155,
+       "start": 20
+      }
+     ],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "tradeoff_reasoning",
+     "score": 1,
+     "confidence": 0.7678106324799496,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    }
+   ]
+  },
+  {
+   "id": "01a0ac0e-a924-7ab1-b0ab-e06e3387dc01",
+   "index": 2,
+   "speaker": "persona",
+   "text": "Let's keep going \u2014 what's your answer?",
+   "text_scrubbed": "Let's keep going \u2014 what's your answer?",
+   "start_ms": 61285,
+   "end_ms": 66244,
+   "word_timings": [],
+   "truncated": false,
+   "asr_confidence": null,
+   "metrics": null,
+   "scores": []
+  },
+  {
+   "id": "01a0ac0e-d921-71a0-9b56-de65e6d9fc1a",
+   "index": 3,
+   "speaker": "user",
+   "text": "I learned to bring a measurement to a disagreement early, instead of arguing opinions.",
+   "text_scrubbed": "I learned to bring a measurement to a disagreement early, instead of arguing opinions.",
+   "start_ms": 67545,
+   "end_ms": 73188,
+   "word_timings": [
+    {
+     "word": "I",
+     "start_ms": 0,
+     "end_ms": 40
+    },
+    {
+     "word": "learned",
+     "start_ms": 40,
+     "end_ms": 320
+    },
+    {
+     "word": "to",
+     "start_ms": 320,
+     "end_ms": 640
+    },
+    {
+     "word": "bring",
+     "start_ms": 640,
+     "end_ms": 860
+    },
+    {
+     "word": "a",
+     "start_ms": 860,
+     "end_ms": 1040
+    },
+    {
+     "word": "measurement",
+     "start_ms": 1040,
+     "end_ms": 1420
+    },
+    {
+     "word": "to",
+     "start_ms": 1420,
+     "end_ms": 1740
+    },
+    {
+     "word": "a",
+     "start_ms": 1740,
+     "end_ms": 1860
+    },
+    {
+     "word": "disagreement",
+     "start_ms": 1860,
+     "end_ms": 2360
+    },
+    {
+     "word": "early,",
+     "start_ms": 2360,
+     "end_ms": 3040
+    },
+    {
+     "word": "instead",
+     "start_ms": 3400,
+     "end_ms": 3700
+    },
+    {
+     "word": "of",
+     "start_ms": 3700,
+     "end_ms": 3880
+    },
+    {
+     "word": "arguing",
+     "start_ms": 3880,
+     "end_ms": 4380
+    },
+    {
+     "word": "opinions.",
+     "start_ms": 4380,
+     "end_ms": 4900
+    }
+   ],
+   "truncated": false,
+   "asr_confidence": 0.8223461140612298,
+   "metrics": {
+    "wpm": 96.86346863468634,
+    "filler_count": 0,
+    "filler_rate": 0.0,
+    "longest_pause_ms": 71458,
+    "speech_ratio": 0.5235239852398524,
+    "word_count": 14
+   },
+   "scores": [
+    {
+     "criterion_key": "delivery",
+     "score": 5,
+     "confidence": 1.0,
+     "evidence_spans": [],
+     "model_version": "deterministic-v1"
+    },
+    {
+     "criterion_key": "structure",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "specificity",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "relevance",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "concision",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "confidence",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "technical_depth",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    },
+    {
+     "criterion_key": "tradeoff_reasoning",
+     "score": null,
+     "confidence": 0.0,
+     "evidence_spans": [],
+     "model_version": "prompted:groq/openai/gpt-oss-20b:1.0.0"
+    }
+   ]
+  },
+  {
+   "id": "01a0ac0e-e4de-7d91-8901-4ae76cdefb75",
+   "index": 3,
+   "speaker": "persona",
+   "text": "Can you give me an example of when you did that?",
+   "text_scrubbed": "Can you give me an example of when you did that?",
+   "start_ms": 79362,
+   "end_ms": 81917,
+   "word_timings": [],
+   "truncated": false,
+   "asr_confidence": null,
+   "metrics": null,
+   "scores": []
+  }
+ ],
+ "scores": [
+  {
+   "criterion_key": "structure",
+   "name": "Structure",
+   "aggregate_score": 4.52,
+   "confidence": 0.7339,
+   "percentile_vs_self": null,
+   "evidence_turn_ids": [
+    "01a0ac0d-e9e4-7ac2-b69e-e9a4c55ee660",
+    "01a0ac0e-9e38-7b02-8942-0d25f3a6b404"
+   ],
+   "anchor_descriptors": {
+    "1": "No discernible organisation. The answer starts mid-thought or never resolves.",
+    "2": "Facts in the order they occurred to the speaker, with no signposting \u2014 a listener would need to ask how it ended.",
+    "3": "Recognisable beginning and end, but the middle wanders or the order has to be reconstructed by the listener.",
+    "4": "A clear arc with one weak transition or a missing close. Still easy to follow throughout.",
+    "5": "Opens by naming the situation, moves through action to outcome, and closes by returning to the question asked."
+   }
+  },
+  {
+   "criterion_key": "specificity",
+   "name": "Specificity",
+   "aggregate_score": 2.92,
+   "confidence": 0.8017,
+   "percentile_vs_self": null,
+   "evidence_turn_ids": [
+    "01a0ac0d-e9e4-7ac2-b69e-e9a4c55ee660",
+    "01a0ac0e-9e38-7b02-8942-0d25f3a6b404"
+   ],
+   "anchor_descriptors": {
+    "1": "Entirely abstract \u2014 no names, numbers, tools, or concrete artifacts mentioned anywhere in the answer.",
+    "2": "One concrete detail surfaces only when asked directly; the rest of the answer stays generic.",
+    "3": "A few concrete details appear unprompted, but key claims about impact or scale remain unquantified.",
+    "4": "Most claims carry a specific number, name, or artifact; one or two remain vague even on request.",
+    "5": "Every material claim is anchored to a number, a named tool or person, or a decision the listener could verify."
+   }
+  },
+  {
+   "criterion_key": "relevance",
+   "name": "Relevance",
+   "aggregate_score": 1.0,
+   "confidence": 0.8017,
+   "percentile_vs_self": null,
+   "evidence_turn_ids": [
+    "01a0ac0d-e9e4-7ac2-b69e-e9a4c55ee660",
+    "01a0ac0e-9e38-7b02-8942-0d25f3a6b404"
+   ],
+   "anchor_descriptors": {
+    "1": "The answer addresses a different question than the one asked and never returns to it.",
+    "2": "The answer opens on-topic but drifts within the first third and never comes back to the question.",
+    "3": "The answer covers the question but pads it with tangential detail a listener would need to skip past.",
+    "4": "The answer stays on topic throughout, with only brief detours that are clearly flagged as asides.",
+    "5": "Every sentence serves the question asked; nothing would need to be cut to tighten the answer."
+   }
+  },
+  {
+   "criterion_key": "concision",
+   "name": "Concision",
+   "aggregate_score": 5.0,
+   "confidence": 0.8017,
+   "percentile_vs_self": null,
+   "evidence_turn_ids": [
+    "01a0ac0d-e9e4-7ac2-b69e-e9a4c55ee660",
+    "01a0ac0e-9e38-7b02-8942-0d25f3a6b404"
+   ],
+   "anchor_descriptors": {
+    "1": "The answer repeats the same point three or more times in different words without adding information.",
+    "2": "The answer eventually lands the point but takes roughly twice as long as the content requires.",
+    "3": "The answer has one clear redundant pass \u2014 a restatement or a false start \u2014 before settling.",
+    "4": "The answer is efficient with a single minor detour that a light edit would remove entirely.",
+    "5": "The answer reaches the point directly and stops once it is made, with no restatement anywhere."
+   }
+  },
+  {
+   "criterion_key": "confidence",
+   "name": "Confidence",
+   "aggregate_score": 3.44,
+   "confidence": 0.8017,
+   "percentile_vs_self": null,
+   "evidence_turn_ids": [
+    "01a0ac0d-e9e4-7ac2-b69e-e9a4c55ee660",
+    "01a0ac0e-9e38-7b02-8942-0d25f3a6b404"
+   ],
+   "anchor_descriptors": {
+    "1": "The answer is dominated by hedges such as 'I guess' or 'maybe' on claims the speaker should know cold.",
+    "2": "Hedging appears on more than half of the answer's key claims, including ones within the speaker's own experience.",
+    "3": "The answer hedges on the harder half of its claims but states the easier ones plainly and directly.",
+    "4": "The answer states claims plainly with occasional hedging only where the uncertainty is genuine.",
+    "5": "The answer states every claim plainly and flags uncertainty only where it is genuinely warranted."
+   }
+  },
+  {
+   "criterion_key": "technical_depth",
+   "name": "Technical depth",
+   "aggregate_score": null,
+   "confidence": 0.0,
+   "percentile_vs_self": null,
+   "evidence_turn_ids": [],
+   "anchor_descriptors": {
+    "1": "The answer names technologies but cannot describe how any of them actually work or interact.",
+    "2": "The answer describes what a component does at a surface level but not how or why it behaves that way.",
+    "3": "The answer explains the mechanism for the central component but treats surrounding pieces as black boxes.",
+    "4": "The answer explains the mechanism for most components discussed, with one gap the listener has to fill.",
+    "5": "The answer explains every component's mechanism, including what happens when a stated assumption breaks."
+   }
+  },
+  {
+   "criterion_key": "tradeoff_reasoning",
+   "name": "Trade-off reasoning",
+   "aggregate_score": null,
+   "confidence": 0.0,
+   "percentile_vs_self": null,
+   "evidence_turn_ids": [],
+   "anchor_descriptors": {
+    "1": "The answer presents one approach with no indication any alternative was ever considered.",
+    "2": "The answer names an alternative only when asked, without comparing it to the chosen approach.",
+    "3": "The answer names one alternative and states a preference, but does not say what was given up.",
+    "4": "The answer compares at least two approaches and names a concrete cost of the one that was chosen.",
+    "5": "The answer compares multiple approaches against the problem's constraints and names exactly what was traded away and why that trade was acceptable."
+   }
+  },
+  {
+   "criterion_key": "delivery",
+   "name": "Delivery",
+   "aggregate_score": 4.75,
+   "confidence": 1.0,
+   "percentile_vs_self": null,
+   "evidence_turn_ids": [
+    "01a0ac0d-e9e4-7ac2-b69e-e9a4c55ee660",
+    "01a0ac0e-30b1-7781-b32e-95f0b168765b",
+    "01a0ac0e-9e38-7b02-8942-0d25f3a6b404",
+    "01a0ac0e-d921-71a0-9b56-de65e6d9fc1a"
+   ],
+   "anchor_descriptors": {
+    "1": "Pace, filler rate, answer length and talk-time share are all well outside a comfortable interview range.",
+    "2": "Two or more of pace, fillers, length and talk-time share are noticeably off.",
+    "3": "Delivery is serviceable \u2014 one dimension, often pace or length, drifts outside the target range.",
+    "4": "Delivery is comfortable throughout, with only a minor deviation in one dimension.",
+    "5": "Pace, filler rate, answer length and talk-time share are all comfortably within range."
+   }
+  }
+ ],
+ "report": {
+  "id": "01a0ac0e-f65c-7ec1-a41e-ffca26239bb6",
+  "session_id": "01a0ac0d-a66e-7f53-ba73-bd2dec3b19fd",
+  "status": "ready",
+  "summary": "This session scored 6 of 8 criteria with enough signal to report. The highest-scoring area was Concision (5.0/5); the area with the most room to grow was Confidence (3.44/5).",
+  "strengths": [
+   "Concision scored 5.0/5.",
+   "Delivery scored 4.75/5.",
+   "Structure scored 4.52/5."
+  ],
+  "growth_areas": [
+   "Confidence scored 3.44/5 \u2014 the most room to improve here.",
+   "Specificity scored 2.92/5 \u2014 the most room to improve here.",
+   "Relevance scored 1.0/5 \u2014 the most room to improve here."
+  ],
+  "next_actions": [],
+  "highlight_turn_id": "01a0ac0e-30b1-7781-b32e-95f0b168765b",
+  "lowlight_turn_id": "01a0ac0d-e9e4-7ac2-b69e-e9a4c55ee660",
+  "low_sample_size": false,
+  "generated_at": "2026-09-16T21:10:56.859491Z"
+ },
+ "recording": {
+  "url": "/demo/sample-session.mp3",
+  "format": null,
+  "peaks": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.183,
+   0.795,
+   0.632,
+   0.319,
+   0.641,
+   0.985,
+   0.855,
+   0.45,
+   0.465,
+   0.246,
+   0.102,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.66,
+   0.768,
+   0.372,
+   0.018,
+   0.144,
+   1.0,
+   0.575,
+   0.864,
+   0.626,
+   0.354,
+   0.608,
+   0.504,
+   0.486,
+   0.621,
+   0.526,
+   0.863,
+   0.683,
+   0.614,
+   0.342,
+   0.502,
+   0.582,
+   0.175,
+   0.659,
+   0.076,
+   0.433,
+   0.515,
+   0.801,
+   0.555,
+   0.494,
+   0.436,
+   0.344,
+   0.515,
+   0.384,
+   0.131,
+   0.012,
+   0.002,
+   0.0,
+   0.436,
+   0.446,
+   0.484,
+   0.809,
+   0.41,
+   0.473,
+   0.916,
+   1.0,
+   0.421,
+   0.515,
+   0.538,
+   0.741,
+   0.418,
+   0.371,
+   0.075,
+   0.181,
+   0.622,
+   0.421,
+   0.277,
+   0.419,
+   0.652,
+   0.619,
+   0.429,
+   0.312,
+   0.681,
+   0.751,
+   0.277,
+   0.476,
+   0.787,
+   0.447,
+   0.159,
+   0.204,
+   0.033,
+   0.002,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.424,
+   0.834,
+   0.665,
+   0.129,
+   0.432,
+   0.451,
+   0.366,
+   0.986,
+   0.687,
+   0.39,
+   0.491,
+   0.493,
+   0.416,
+   0.334,
+   0.199,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.658,
+   1.0,
+   0.247,
+   0.261,
+   0.532,
+   0.706,
+   0.659,
+   0.266,
+   0.409,
+   0.381,
+   0.497,
+   0.483,
+   0.483,
+   0.859,
+   0.522,
+   0.39,
+   0.411,
+   0.44,
+   0.464,
+   0.456,
+   0.621,
+   0.291,
+   0.146,
+   0.003,
+   0.443,
+   0.618,
+   0.45,
+   0.506,
+   0.418,
+   0.389,
+   0.449,
+   0.397,
+   0.734,
+   0.395,
+   0.185,
+   0.281,
+   0.235,
+   0.006,
+   0.632,
+   0.6,
+   0.358,
+   0.43,
+   0.681,
+   0.538,
+   0.871,
+   0.794,
+   0.459,
+   0.478,
+   0.48,
+   0.351,
+   0.143,
+   0.105,
+   0.21,
+   0.036,
+   0.002,
+   0.0,
+   0.002,
+   0.711,
+   0.564,
+   0.88,
+   0.618,
+   0.434,
+   0.835,
+   0.788,
+   0.697,
+   0.728,
+   0.775,
+   0.711,
+   0.886,
+   0.662,
+   0.957,
+   1.0,
+   0.346,
+   0.54,
+   0.574,
+   0.269,
+   0.202,
+   0.261,
+   0.026,
+   0.002,
+   0.002,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.002,
+   0.629,
+   0.437,
+   0.99,
+   0.695,
+   0.274,
+   0.811,
+   0.783,
+   0.549,
+   0.594,
+   0.565,
+   0.671,
+   0.312,
+   0.015,
+   0.388,
+   0.996,
+   0.806,
+   0.255,
+   0.657,
+   0.417,
+   0.505,
+   0.326,
+   0.254,
+   0.441,
+   0.448,
+   0.249,
+   0.306,
+   0.444,
+   0.321,
+   0.605,
+   0.165,
+   0.909,
+   0.827,
+   0.419,
+   0.387,
+   0.177,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.021,
+   0.528,
+   0.43,
+   0.917,
+   0.547,
+   0.036,
+   0.355,
+   0.547,
+   0.47,
+   0.639,
+   0.997,
+   0.334,
+   0.352,
+   0.309,
+   0.297,
+   0.152,
+   0.004,
+   0.002,
+   0.002,
+   0.017,
+   1.0,
+   0.977,
+   0.794,
+   0.944,
+   0.277,
+   0.47,
+   0.432,
+   0.401,
+   0.838,
+   0.873,
+   0.551,
+   0.377,
+   0.606,
+   0.292,
+   0.235,
+   0.127,
+   0.026,
+   0.003,
+   0.002,
+   0.0,
+   0.828,
+   0.937,
+   0.354,
+   0.69,
+   0.527,
+   0.361,
+   0.68,
+   0.507,
+   0.365,
+   0.248,
+   0.159,
+   0.098,
+   0.858,
+   0.959,
+   0.754,
+   0.387,
+   0.74,
+   0.58,
+   0.602,
+   0.504,
+   0.527,
+   0.502,
+   0.418,
+   0.45,
+   0.307,
+   0.222,
+   0.649,
+   0.51,
+   0.329,
+   0.192,
+   0.002,
+   1.0,
+   0.742,
+   0.509,
+   0.637,
+   0.515,
+   0.43,
+   0.441,
+   0.319,
+   0.193,
+   0.265,
+   0.294,
+   0.047,
+   0.001,
+   0.603,
+   0.336,
+   0.17,
+   0.499,
+   0.456,
+   0.666,
+   0.995,
+   0.542,
+   0.364,
+   0.606,
+   0.886,
+   0.928,
+   0.608,
+   0.268,
+   0.656,
+   0.675,
+   0.337,
+   0.196,
+   0.664,
+   0.421,
+   0.517,
+   0.572,
+   0.664,
+   0.541,
+   0.445,
+   0.298,
+   0.204,
+   0.302,
+   0.456,
+   0.247,
+   0.655,
+   0.725,
+   0.833,
+   0.744,
+   0.419,
+   0.526,
+   0.293,
+   0.685,
+   0.512,
+   0.465,
+   0.539,
+   0.301,
+   0.31,
+   0.162,
+   0.088,
+   0.189,
+   0.019,
+   0.02,
+   0.002,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.81,
+   0.449,
+   0.983,
+   0.978,
+   0.405,
+   0.137,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.276,
+   0.821,
+   0.283,
+   0.316,
+   0.376,
+   0.124,
+   0.993,
+   0.707,
+   0.235,
+   0.108,
+   0.003,
+   0.011,
+   0.833,
+   0.211,
+   0.599,
+   0.856,
+   0.508,
+   0.273,
+   0.347,
+   0.045,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.001,
+   0.787,
+   0.464,
+   0.871,
+   0.95,
+   0.843,
+   0.528,
+   0.395,
+   0.497,
+   0.817,
+   0.496,
+   0.563,
+   0.582,
+   0.717,
+   0.858,
+   0.441,
+   0.43,
+   0.582,
+   0.529,
+   0.487,
+   0.541,
+   0.611,
+   0.655,
+   0.408,
+   0.719,
+   0.671,
+   0.611,
+   0.557,
+   0.555,
+   0.851,
+   0.77,
+   0.272,
+   0.183,
+   0.002,
+   0.27,
+   0.282,
+   0.497,
+   0.703,
+   0.548,
+   0.421,
+   0.507,
+   0.999,
+   0.75,
+   0.567,
+   0.771,
+   0.591,
+   0.592,
+   0.495,
+   0.677,
+   0.438,
+   0.358,
+   0.114,
+   0.263,
+   0.211,
+   0.005,
+   0.002,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.22,
+   0.581,
+   0.581,
+   0.555,
+   0.56,
+   0.509,
+   0.525,
+   0.455,
+   0.574,
+   0.648,
+   0.996,
+   0.351,
+   0.552,
+   0.525,
+   0.397,
+   0.393,
+   0.574,
+   0.537,
+   0.522,
+   0.515,
+   0.633,
+   0.536,
+   0.214,
+   0.08,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "duration_ms": 82417
+ },
+ "latency_by_turn": {
+  "01a0ac0d-e9e4-7ac2-b69e-e9a4c55ee660": {
+   "endpoint_detect": 768,
+   "asr_finalize": 1551,
+   "prompt_assemble": 0,
+   "model_ttft": 660,
+   "tts_first_chunk": 237,
+   "e2e": 3281
+  },
+  "01a0ac0e-30b1-7781-b32e-95f0b168765b": {
+   "endpoint_detect": 771,
+   "asr_finalize": 1642,
+   "prompt_assemble": 0,
+   "model_ttft": 685,
+   "tts_first_chunk": 232,
+   "e2e": 3409,
+   "first_chunk_assemble": 740
+  },
+  "01a0ac0e-9e38-7b02-8942-0d25f3a6b404": {
+   "endpoint_detect": 744,
+   "asr_finalize": 1665,
+   "prompt_assemble": 0,
+   "first_chunk_assemble": 261,
+   "e2e": 3532
+  },
+  "01a0ac0e-d921-71a0-9b56-de65e6d9fc1a": {
+   "endpoint_detect": 782,
+   "asr_finalize": 1274,
+   "prompt_assemble": 0,
+   "model_ttft": 607,
+   "tts_first_chunk": 292,
+   "e2e": 3778
+  }
+ }
+}

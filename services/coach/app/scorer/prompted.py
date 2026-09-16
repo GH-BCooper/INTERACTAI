@@ -90,9 +90,7 @@ class PromptedScorer:
         # not part of the `Scorer` Protocol itself.
         self.last_call_stats: CallStats | None = None
 
-    async def score(
-        self, question: str, answer: str, criterion: RubricCriterion
-    ) -> CriterionScore:
+    async def score(self, question: str, answer: str, criterion: RubricCriterion) -> CriterionScore:
         results = await self.score_batch(question, answer, [criterion])
         return results[0]
 

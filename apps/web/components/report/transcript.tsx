@@ -27,6 +27,7 @@ function TranscriptRow({
   annotatableCriteria,
   personaAudioCache,
   personaVoiceId,
+  readOnly,
 }: {
   turn: TurnOut;
   active: boolean;
@@ -35,6 +36,7 @@ function TranscriptRow({
   annotatableCriteria: AnnotatableCriterion[];
   personaAudioCache: PersonaAudioCache | null;
   personaVoiceId: string | null;
+  readOnly: boolean;
 }) {
   const router = useRouter();
   const retryQuestion = useRetryQuestion(sessionId);
@@ -86,7 +88,7 @@ function TranscriptRow({
           >
             {formatTimestamp(turn.start_ms)}
           </button>
-          {turn.speaker === "user" && (
+          {turn.speaker === "user" && !readOnly && (
             <button
               type="button"
               onClick={() => void retryThisQuestion()}
@@ -169,6 +171,7 @@ export function Transcript({
   annotatableCriteria,
   personaAudioCache,
   personaVoiceId,
+  readOnly = false,
 }: {
   turns: TurnOut[];
   sessionId: string;
@@ -176,6 +179,8 @@ export function Transcript({
   annotatableCriteria: AnnotatableCriterion[];
   personaAudioCache: PersonaAudioCache | null;
   personaVoiceId: string | null;
+  /** Phase 6 TASK 6.5: the public /demo has no account, so actions that create sessions hide. */
+  readOnly?: boolean;
 }) {
   const playheadMs = usePlayerStore((s) => s.playheadMs);
   const currentTurn = useMemo(() => findCurrentTurn(turns, playheadMs), [turns, playheadMs]);
@@ -198,6 +203,7 @@ export function Transcript({
             annotatableCriteria={annotatableCriteria}
             personaAudioCache={personaAudioCache}
             personaVoiceId={personaVoiceId}
+            readOnly={readOnly}
           />
         </div>
       ))}

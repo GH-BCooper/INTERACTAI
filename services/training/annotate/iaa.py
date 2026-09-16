@@ -178,8 +178,8 @@ def render_report(result: dict[str, object]) -> str:
     overall = result["overall_qwk"]
     if overall is not None and overall < 0.5:
         lines.append(
-            "> **Below 0.5.** docs/phase-5-BUILD.md TASK 5.3c: \"fix the rubric anchors before "
-            "training anything.\" A model cannot be more consistent than its labels."
+            '> **Below 0.5.** docs/phase-5-BUILD.md TASK 5.3c: "fix the rubric anchors before '
+            'training anything." A model cannot be more consistent than its labels.'
         )
     return "\n".join(lines) + "\n"
 

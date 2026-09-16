@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.exceptions import NotFoundError, ValidationAppError
-from ..models import EvalRun, ModelVersion
+from ..models import DeploymentEvent, EvalRun, ModelVersion
 
 
 class PromotionRejectedError(ValidationAppError):
@@ -69,8 +69,8 @@ async def promote(
     if len(candidate_qwks) < min_seeds:
         raise PromotionRejectedError(
             f"Candidate has {len(candidate_qwks)} published test-split seed(s), needs "
-            f">= {min_seeds} (docs/phase-5-BUILD.md TASK 5.4: \"Three seeds per configuration, "
-            "always\")."
+            f'>= {min_seeds} (docs/phase-5-BUILD.md TASK 5.4: "Three seeds per configuration, '
+            'always").'
         )
 
     current_active = await get_active(db, candidate.role)
@@ -87,6 +87,13 @@ async def promote(
         current_active.status = "retired"
 
     candidate.status = "active"
+    db.add(
+        DeploymentEvent(
+            kind="model_promoted",
+            label=f"{candidate.role}: {candidate.name}",
+            model_version_id=candidate.id,
+        )
+    )
     await db.flush()
     return candidate
 
@@ -110,6 +117,13 @@ async def rollback(db: AsyncSession, *, target_version_id: std_uuid.UUID) -> Mod
         current_active.status = "retired"
 
     target.status = "active"
+    db.add(
+        DeploymentEvent(
+            kind="model_rolled_back",
+            label=f"{target.role}: rollback to {target.name}",
+            model_version_id=target.id,
+        )
+    )
     await db.flush()
     return target
 

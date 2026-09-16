@@ -120,6 +120,7 @@ class TurnSink(Protocol):
         speech_ratio: float,
         word_count: int,
     ) -> None: ...
+    async def enqueue_score_turn(self, turn_id: std_uuid.UUID) -> None: ...
 
 
 @dataclass
@@ -319,6 +320,10 @@ async def process_turn(
         speech_ratio=metrics.speech_ratio,
         word_count=metrics.word_count,
     )
+    # Task 2.2d: the coach scores off the latency path. The turn and its metrics row both exist
+    # now; the sink fires the enqueue as a background task and returns immediately. (Found
+    # unwired in Phase 6 — generate_report waited forever on turns that were never scored.)
+    await sink.enqueue_score_turn(turn_id)
 
     if persona_context is not None and persona_context.difficulty.silence_after_answer_ms > 0:
         # Task 2.3c: enforced in code, not just prompt text — hard difficulty's deliberate

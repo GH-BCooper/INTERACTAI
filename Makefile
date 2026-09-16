@@ -3,7 +3,7 @@
 
 SHELL := /usr/bin/bash
 .DEFAULT_GOAL := help
-.PHONY: help up down logs migrate makemigration seed api realtime coach web schema test safety lint fmt cli eval clean _sync _pnpm
+.PHONY: help up down logs migrate makemigration seed api realtime coach web schema test safety lint fmt cli eval eval-speech eval-persona eval-all images selfhost demo-record clean _sync _pnpm
 
 help:
 	@echo "InteractAI - make targets:"
@@ -23,7 +23,12 @@ help:
 	@echo "  lint           ruff + mypy + eslint + tsc --noEmit"
 	@echo "  fmt            ruff format + fix"
 	@echo "  cli            terminal voice harness (Phase 1 gate)"
-	@echo "  eval           run the evaluation suites"
+	@echo "  eval           Level 3 scorer evaluation (writes an eval_runs row)"
+	@echo "  eval-speech    Level 1 speech components: WER, RTF gates, endpointing, TTFA"
+	@echo "  eval-persona   Level 2 persona adherence: breaks, repetition, plan, difficulty separation"
+	@echo "  eval-all       all three levels (what the nightly workflow runs)"
+	@echo "  images         build the production images for api, coach, realtime, web"
+	@echo "  selfhost       the whole stack in containers, local models, zero external keys"
 	@echo "  clean          remove local data volumes (asks for confirmation)"
 
 # ── internal bootstrap prerequisites — not part of the required target list, but keep
@@ -93,6 +98,23 @@ cli: _sync
 
 eval: _sync
 	uv run python scripts/eval.py
+
+eval-speech: _sync
+	uv run python scripts/eval_speech.py
+
+eval-persona: _sync
+	uv run python scripts/eval_persona.py
+
+eval-all: eval-speech eval-persona eval
+
+images:
+	docker build -f services/api/Dockerfile -t interactai-api .
+	docker build -f services/coach/Dockerfile -t interactai-coach .
+	docker build -f services/realtime/Dockerfile -t interactai-realtime .
+	docker build -f apps/web/Dockerfile -t interactai-web .
+
+selfhost:
+	docker compose -f compose.selfhost.yml up --build
 
 clean:
 	@echo "This permanently deletes local Postgres, Redis and MinIO data (docker volumes)."

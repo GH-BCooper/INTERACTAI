@@ -395,3 +395,152 @@ export interface UserDataExport {
     turns: TurnOut[];
   }>;
 }
+
+// ── Phase 6 TASK 6.1/6.2 — observability and evaluations (admin) ───────────────────────────
+
+export interface PercentileRow {
+  p50: number | null;
+  p90: number | null;
+  p95: number | null;
+  n: number;
+}
+
+export interface LatencyHeaderOut {
+  target_p95_ms: number;
+  overall: PercentileRow;
+  series: (PercentileRow & { bucket: string })[];
+  families: string[];
+  host_classes: string[];
+}
+
+export interface StageRow {
+  stage: string;
+  p50: number | null;
+  p95: number | null;
+  n: number;
+}
+
+export interface ObservedTurn {
+  turn_id: string;
+  session_id: string;
+  e2e_ms: number;
+  created_at: string;
+}
+
+export interface ModelCallOut {
+  id: string;
+  session_id: string;
+  turn_id: string | null;
+  role: string;
+  model: string;
+  prompt_version: string | null;
+  tokens_in: number;
+  tokens_out: number;
+  ttft_ms: number | null;
+  total_latency_ms: number;
+  cost_cents: number;
+  cached: boolean;
+  created_at: string;
+}
+
+export interface ModelCallPage {
+  items: ModelCallOut[];
+  total: number;
+  cache_hits: number;
+  cache_misses: number;
+}
+
+export interface WaterfallOut {
+  turn_id: string;
+  session_id: string;
+  e2e_ms: number | null;
+  stages: { stage: string; duration_ms: number | null; model_calls: ModelCallOut[] }[];
+  all_model_calls: ModelCallOut[];
+  user_text: string | null;
+  user_start_ms: number | null;
+  user_end_ms: number | null;
+  persona_turn_id: string | null;
+  persona_text: string | null;
+  persona_voice_id: string | null;
+  recording_available: boolean;
+}
+
+export interface CostPanelOut {
+  actual_total_cents: number;
+  scoring_actual_cents: number;
+  turn_scores: number;
+  counterfactual_cents: number | null;
+  ratio: number | null;
+  frontier: { model: string; input_usd_per_mtok: number; output_usd_per_mtok: number; as_of: string };
+  per_month: { month: string; cents: number }[];
+  per_session: { session_id: string; cents: number }[];
+  per_user: { user: string; cents: number }[];
+}
+
+export interface ModelVersionRow {
+  id: string;
+  role: string;
+  name: string;
+  base_model: string;
+  adapter_key: string | null;
+  dataset_revision_hash: string | null;
+  metrics: Record<string, unknown>;
+  status: "training" | "candidate" | "active" | "retired";
+  seed_count: number;
+  created_at: string;
+}
+
+export interface EvalRunRow {
+  id: string;
+  suite: string;
+  configuration: string;
+  model_version_id: string | null;
+  prompt_version: string | null;
+  qwk: number | null;
+  mae: number | null;
+  spearman: number | null;
+  adjacent_accuracy: number | null;
+  ece: number | null;
+  mean_cost_cents: number | null;
+  mean_latency_ms: number | null;
+  metrics: Record<string, number | string | boolean | null>;
+  host_class: string | null;
+  dataset_revision_hash: string;
+  split: string;
+  published: boolean;
+  created_at: string;
+}
+
+export interface RegressionOut {
+  runs: EvalRunRow[];
+  deployments: { id: string; kind: string; label: string; created_at: string }[];
+}
+
+export interface EvalCaseRow {
+  session_id: string;
+  turn_id: string;
+  criterion_key: string;
+  model_score: number;
+  confidence: number;
+  model_version: string;
+  human_mean: number;
+  human_scores: number[];
+  disagreement: number;
+  turn_text: string | null;
+}
+
+export interface CompareOut {
+  version_a: string;
+  version_b: string;
+  shared_cases: number;
+  disagreements: number;
+  per_criterion: Record<string, { cases: number; disagreements: number }>;
+  items: {
+    turn_id: string;
+    criterion_key: string;
+    score_a: number | null;
+    score_b: number | null;
+    gap: number | null;
+    disagrees: boolean;
+  }[];
+}

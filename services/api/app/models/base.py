@@ -35,9 +35,7 @@ class Base(DeclarativeBase):
 class UUIDPk:
     """Non-partitioned tables: a plain single-column UUIDv7 primary key."""
 
-    id: Mapped[std_uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), primary_key=True, default=uuid7
-    )
+    id: Mapped[std_uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid7)
 
 
 class TimestampMixin:

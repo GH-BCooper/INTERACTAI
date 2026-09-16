@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.config import get_settings
 from ..core.ids import uuid7
 from .tables import latency_events, model_calls, sessions, turn_metrics, turns
 
@@ -87,6 +88,7 @@ async def insert_turn(
             word_timings=word_timings,
             truncated=truncated,
             asr_confidence=asr_confidence,
+            training_excluded=False,
         )
     )
     await db.commit()
@@ -130,7 +132,11 @@ async def insert_latency_events(db: AsyncSession, rows: list[dict[str, Any]]) ->
     if not rows:
         return
     now = datetime.now(UTC)
-    prepared = [{"id": uuid7(), **row, "created_at": now, "updated_at": now} for row in rows]
+    host_class = get_settings().host_class
+    prepared = [
+        {"id": uuid7(), "host_class": host_class, **row, "created_at": now, "updated_at": now}
+        for row in rows
+    ]
     await db.execute(insert(latency_events), prepared)
     await db.commit()
 

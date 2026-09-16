@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "note": "Level 1 speech-suite fixture set (Phase 6 TASK 6.3a). Reference transcripts are the exact text each clip was synthesized from (scripts/generate_audio_fixtures.py and the Phase 6 additions). All clips are Piper TTS, not recorded human speech; 'accented' means the British English Piper voice.",
+  "items": [
+    {"file": "clean_utterance_3s.wav", "group": "clean", "reference": "The deployment finished about ten minutes ago, and it looks good."},
+    {"file": "mid_sentence_pause_700ms.wav", "group": "clean", "reference": "I checked the logs first, and found the issue quickly."},
+    {"file": "accented_utterance.wav", "group": "accented", "reference": "I'd say the whole process took roughly three weeks, give or take a few days."},
+    {"file": "accented_behavioural.wav", "group": "accented", "reference": "I disagreed with my manager about the deadline, so I brought data to the meeting and we agreed on a smaller scope."},
+    {"file": "technical_vocab_us.wav", "group": "technical", "reference": "We sharded the Postgres cluster, put Redis in front of it, and moved the Kubernetes ingress behind a load balancer."},
+    {"file": "technical_vocab_accented.wav", "group": "technical", "reference": "The p95 latency regressed after the gRPC migration, so we rolled back the canary and added an index."}
+  ],
+  "tts_texts": [
+    "Thanks for coming in. Walk me through the hardest thing you shipped this year.",
+    "What exactly did you measure, and what changed as a result?"
+  ]
+}

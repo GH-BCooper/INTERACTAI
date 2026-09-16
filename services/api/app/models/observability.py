@@ -31,7 +31,13 @@ class LatencyEvent(UUIDPk, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(sql_in("stage", LATENCY_STAGES), name="ck_latency_events_stage"),
         Index("ix_latency_events_session_turn", "session_id", "turn_id"),
-        Index("ix_latency_events_stage_created_at", "stage", "created_at"),
+        # Covering index (migration b8c9d0e1f2a3): the e2e percentile query is index-only.
+        Index(
+            "ix_latency_events_stage_created_at_cover",
+            "stage",
+            "created_at",
+            postgresql_include=["duration_ms", "session_id", "turn_id", "host_class"],
+        ),
     )
 
     session_id: Mapped[std_uuid.UUID] = mapped_column(
@@ -40,6 +46,8 @@ class LatencyEvent(UUIDPk, TimestampMixin, Base):
     turn_id: Mapped[std_uuid.UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     stage: Mapped[str] = mapped_column(Text, nullable=False)
     duration_ms: Mapped[float] = mapped_column(Float, nullable=False)
+    # Phase 6 TASK 6.1a: filter by host class. NULL for rows written before it was recorded.
+    host_class: Mapped[str | None] = mapped_column(Text)
 
 
 class ModelCall(UUIDPk, TimestampMixin, Base):
@@ -51,6 +59,7 @@ class ModelCall(UUIDPk, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(sql_in("role", MODEL_CALL_ROLES), name="ck_model_calls_role"),
         Index("ix_model_calls_session_created_at", "session_id", "created_at"),
+        Index("ix_model_calls_created_at", "created_at"),
     )
 
     session_id: Mapped[std_uuid.UUID] = mapped_column(
@@ -67,3 +76,23 @@ class ModelCall(UUIDPk, TimestampMixin, Base):
     total_latency_ms: Mapped[float] = mapped_column(Float, nullable=False)
     cost_cents: Mapped[float] = mapped_column(Numeric(10, 6), nullable=False, default=0)
     cached: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+DEPLOYMENT_KINDS = ("model_promoted", "model_rolled_back", "prompt_version", "service_deploy")
+
+
+class DeploymentEvent(UUIDPk, TimestampMixin, Base):
+    """Phase 6 TASK 6.2: the markers on the regression chart. A metric that moved is only
+    explicable if you can see what shipped just before it moved."""
+
+    __tablename__ = "deployment_events"
+    __table_args__ = (
+        CheckConstraint(sql_in("kind", DEPLOYMENT_KINDS), name="ck_deployment_events_kind"),
+        Index("ix_deployment_events_created_at", "created_at"),
+    )
+
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    model_version_id: Mapped[std_uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("model_versions.id", ondelete="SET NULL")
+    )

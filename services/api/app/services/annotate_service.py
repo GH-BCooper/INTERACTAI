@@ -87,9 +87,7 @@ async def get_queue(
         .join(Rubric, Rubric.id == Scenario.rubric_id)
         .join(RubricCriterion, RubricCriterion.rubric_id == Rubric.id)
         .where(DatasetMember.dataset_revision_hash == revision.hash)
-        .where(
-            tuple_(DatasetMember.turn_id, RubricCriterion.key).notin_(already_done)
-        )
+        .where(tuple_(DatasetMember.turn_id, RubricCriterion.key).notin_(already_done))
         .order_by(func.random())
         .limit(limit)
     )
@@ -116,9 +114,7 @@ async def get_queue(
         # TASK 5.3d: pre-labelling is train-split only, enforced here — never for
         # validation/test regardless of what the caller asked for.
         pre_label_score = (
-            pre_label_by_key.get((row.turn_id, row.criterion_key))
-            if row.split == "train"
-            else None
+            pre_label_by_key.get((row.turn_id, row.criterion_key)) if row.split == "train" else None
         )
         items.append(
             AnnotationQueueItem(
@@ -170,9 +166,7 @@ async def submit_annotation(db: AsyncSession, admin: User, body: AnnotationSubmi
     max_round = max_round_result.scalar_one()
     next_round = (max_round if max_round is not None else 0) + 1
 
-    session_id_result = await db.execute(
-        select(Turn.session_id).where(Turn.id == body.turn_id)
-    )
+    session_id_result = await db.execute(select(Turn.session_id).where(Turn.id == body.turn_id))
     session_id = session_id_result.scalar_one()
 
     expected_pre_label_score = pre_label_row.score if pre_label_row is not None else None
@@ -254,9 +248,7 @@ async def get_progress(db: AsyncSession) -> AnnotationProgress:
                 continue
             scores_result = await db.execute(
                 select(Annotation.score)
-                .where(
-                    Annotation.turn_id == turn_id, Annotation.criterion_key == criterion_key
-                )
+                .where(Annotation.turn_id == turn_id, Annotation.criterion_key == criterion_key)
                 .distinct()
             )
             scores = [s for (s,) in scores_result.all()]

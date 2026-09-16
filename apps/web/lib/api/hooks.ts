@@ -4,12 +4,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   adminAnnotate,
+  adminEvals,
+  adminObservability,
   me,
   personas,
   rubrics,
   scenarios,
   sessions,
   type CreateSessionBody,
+  type LatencyFilter,
+  type ModelCallFilter,
   type ProfileUpdateBody,
 } from "./resources";
 import type { ProviderName } from "./types";
@@ -246,5 +250,80 @@ export function useAdminAnnotationSubmit() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-annotate"] });
     },
+  });
+}
+
+// ── Phase 6 TASK 6.1/6.2 — admin observability and evaluations ──────────────────────────────
+
+export function useLatencyHeader(f: LatencyFilter) {
+  return useQuery({ queryKey: ["obs", "latency", f], queryFn: () => adminObservability.latency(f) });
+}
+
+export function useStageBreakdown(f: LatencyFilter) {
+  return useQuery({ queryKey: ["obs", "stages", f], queryFn: () => adminObservability.stages(f) });
+}
+
+export function useObservedTurns() {
+  return useQuery({ queryKey: ["obs", "turns"], queryFn: adminObservability.turns });
+}
+
+export function useWaterfall(turnId: string | null) {
+  return useQuery({
+    queryKey: ["obs", "waterfall", turnId],
+    queryFn: () => adminObservability.waterfall(turnId ?? ""),
+    enabled: turnId !== null,
+  });
+}
+
+export function useAdminRecording(sessionId: string | null) {
+  return useQuery({
+    queryKey: ["obs", "recording", sessionId],
+    queryFn: () => adminObservability.recording(sessionId ?? ""),
+    enabled: sessionId !== null,
+  });
+}
+
+export function useModelCalls(f: ModelCallFilter) {
+  return useQuery({ queryKey: ["obs", "model-calls", f], queryFn: () => adminObservability.modelCalls(f) });
+}
+
+export function useCostPanel() {
+  return useQuery({ queryKey: ["obs", "cost"], queryFn: adminObservability.cost });
+}
+
+export function useModelVersions() {
+  return useQuery({ queryKey: ["evals", "versions"], queryFn: adminEvals.versions });
+}
+
+export function useRegression() {
+  return useQuery({ queryKey: ["evals", "regression"], queryFn: adminEvals.regression });
+}
+
+export function useEvalCases(modelVersion?: string) {
+  return useQuery({ queryKey: ["evals", "cases", modelVersion], queryFn: () => adminEvals.cases(modelVersion) });
+}
+
+export function useScoreVersions() {
+  return useQuery({ queryKey: ["evals", "score-versions"], queryFn: adminEvals.scoreVersions });
+}
+
+export function useCompareVersions(a: string | null, b: string | null) {
+  return useQuery({
+    queryKey: ["evals", "compare", a, b],
+    queryFn: () => adminEvals.compare(a ?? "", b ?? ""),
+    enabled: a !== null && b !== null && a !== b,
+  });
+}
+
+export function useSpeechPanel() {
+  return useQuery({ queryKey: ["evals", "speech"], queryFn: adminEvals.speech });
+}
+
+export function useRegistryStatusChange() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ action, id }: { action: "promote" | "rollback"; id: string }) =>
+      action === "promote" ? adminEvals.promote(id) : adminEvals.rollback(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["evals"] }),
   });
 }

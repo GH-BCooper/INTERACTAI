@@ -9,14 +9,16 @@ const sans = Inter({
   subsets: ["latin"],
   weight: ["400", "500"],
   variable: "--font-sans",
-  display: "swap",
+  // "optional": no late font swap re-laying out text after first paint (Lighthouse LCP/CLS, TASK 6.6).
+  display: "optional",
 });
 
 const mono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
   variable: "--font-mono",
-  display: "swap",
+  // "optional": no late font swap re-laying out text after first paint (Lighthouse LCP/CLS, TASK 6.6).
+  display: "optional",
 });
 
 export const metadata: Metadata = {

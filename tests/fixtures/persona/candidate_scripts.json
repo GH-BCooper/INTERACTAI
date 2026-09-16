@@ -1,0 +1,46 @@
+{
+ "version": "1.0.0",
+ "note": "Level 2 persona-suite candidate scripts (Phase 6 TASK 6.3b). Each script mixes vague, strong and rambling (>120 words) answers so follow-up behaviour, acknowledgement length and interruption all have something to respond to in every tier.",
+ "scenarios": [
+  "behavioural-standard",
+  "technical-standard"
+ ],
+ "scripts": [
+  [
+   "We had a disagreement about the plan and we worked through it together.",
+   "So, yeah, it's kind of a long story, because first there was the migration, and then the team changed, and my manager at the time had this idea about the roadmap, and I remember we had a lot of meetings about it, like a lot, and some people wanted to use a queue and some people wanted to use cron jobs, and honestly both were fine, and then there was also the question of the budget, which I wasn't really involved in, but it affected things, and the deadline moved twice, maybe three times, and at some point we just kind of shipped something, and I think it mostly worked, although there were some issues later that another team handled, so I don't totally know how it ended up, but overall I'd say it was a learning experience for everyone.",
+   "I profiled the checkout service, found an unindexed query on the orders table, added a composite index, and p95 dropped from two seconds to three hundred milliseconds within a week.",
+   "Um, I guess, like, communication is important."
+  ],
+  [
+   "I don't really remember, it was fine.",
+   "My PM wanted to launch without load testing. I ran a one-day test, showed that the database would saturate at forty percent of expected traffic, and we delayed the launch by three days to add read replicas.",
+   "So, yeah, it's kind of a long story, because first there was the migration, and then the team changed, and my manager at the time had this idea about the roadmap, and I remember we had a lot of meetings about it, like a lot, and some people wanted to use a queue and some people wanted to use cron jobs, and honestly both were fine, and then there was also the question of the budget, which I wasn't really involved in, but it affected things, and the deadline moved twice, maybe three times, and at some point we just kind of shipped something, and I think it mostly worked, although there were some issues later that another team handled, so I don't totally know how it ended up, but overall I'd say it was a learning experience for everyone.",
+   "Stuff happens, you move on."
+  ],
+  [
+   "So, yeah, it's kind of a long story, because first there was the migration, and then the team changed, and my manager at the time had this idea about the roadmap, and I remember we had a lot of meetings about it, like a lot, and some people wanted to use a queue and some people wanted to use cron jobs, and honestly both were fine, and then there was also the question of the budget, which I wasn't really involved in, but it affected things, and the deadline moved twice, maybe three times, and at some point we just kind of shipped something, and I think it mostly worked, although there were some issues later that another team handled, so I don't totally know how it ended up, but overall I'd say it was a learning experience for everyone.",
+   "Honestly it was a team effort.",
+   "I wrote a one-page proposal comparing Kafka and SQS on cost, latency and operational load, got two senior engineers to review it, and we chose SQS, which saved about eight thousand dollars a year.",
+   "I would probably do the same again."
+  ],
+  [
+   "It was hard but we got there.",
+   "When our on-call pager volume doubled, I categorised three hundred alerts, deleted the forty percent that never needed action, and pages per week went from sixty to twenty-two.",
+   "Kind of, yeah.",
+   "So, yeah, it's kind of a long story, because first there was the migration, and then the team changed, and my manager at the time had this idea about the roadmap, and I remember we had a lot of meetings about it, like a lot, and some people wanted to use a queue and some people wanted to use cron jobs, and honestly both were fine, and then there was also the question of the budget, which I wasn't really involved in, but it affected things, and the deadline moved twice, maybe three times, and at some point we just kind of shipped something, and I think it mostly worked, although there were some issues later that another team handled, so I don't totally know how it ended up, but overall I'd say it was a learning experience for everyone."
+  ],
+  [
+   "I pushed back once, I think.",
+   "So, yeah, it's kind of a long story, because first there was the migration, and then the team changed, and my manager at the time had this idea about the roadmap, and I remember we had a lot of meetings about it, like a lot, and some people wanted to use a queue and some people wanted to use cron jobs, and honestly both were fine, and then there was also the question of the budget, which I wasn't really involved in, but it affected things, and the deadline moved twice, maybe three times, and at some point we just kind of shipped something, and I think it mostly worked, although there were some issues later that another team handled, so I don't totally know how it ended up, but overall I'd say it was a learning experience for everyone.",
+   "Our designer and I disagreed about infinite scroll. I set up an A/B test for two weeks; pagination won on task completion by nine points, so we shipped pagination.",
+   "Not really anything else."
+  ],
+  [
+   "We had some conflict, it resolved.",
+   "I mentored a junior engineer who was stuck on code review feedback. We paired twice a week for a month and her review turnaround went from four days to one.",
+   "Things, you know.",
+   "So, yeah, it's kind of a long story, because first there was the migration, and then the team changed, and my manager at the time had this idea about the roadmap, and I remember we had a lot of meetings about it, like a lot, and some people wanted to use a queue and some people wanted to use cron jobs, and honestly both were fine, and then there was also the question of the budget, which I wasn't really involved in, but it affected things, and the deadline moved twice, maybe three times, and at some point we just kind of shipped something, and I think it mostly worked, although there were some issues later that another team handled, so I don't totally know how it ended up, but overall I'd say it was a learning experience for everyone."
+  ]
+ ]
+}

@@ -359,8 +359,10 @@ class TestAnnotations:
         assert second.json()["round"] == 2
 
         rows = (
-            await db_session.execute(select(Annotation).where(Annotation.turn_id == turn_id))
-        ).scalars().all()
+            (await db_session.execute(select(Annotation).where(Annotation.turn_id == turn_id)))
+            .scalars()
+            .all()
+        )
         assert len(rows) == 2
 
     async def test_annotating_a_turn_from_another_session_is_rejected(

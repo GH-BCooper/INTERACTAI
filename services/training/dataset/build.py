@@ -134,8 +134,10 @@ async def _fetch_eligible_turns(
 
     turns: list[TurnRecord] = []
     for turn_id, session_id, user_id, brief in rows:
-        source = "synthetic" if user_id == synthetic_user_id else (
-            "self" if user_id == self_user_id else "recruited"
+        source = (
+            "synthetic"
+            if user_id == synthetic_user_id
+            else ("self" if user_id == self_user_id else "recruited")
         )
         speaker_key = f"synthetic:{session_id}" if source == "synthetic" else str(user_id)
         quality_level = brief.get("quality_level") if source == "synthetic" and brief else None

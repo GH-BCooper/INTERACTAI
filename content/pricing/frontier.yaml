@@ -1,0 +1,8 @@
+# Phase 6 TASK 6.1e — the frontier rate used for the cost counterfactual ("had every score come
+# from a frontier model"). Content, not code: update the figures and `as_of` when prices change.
+version: 1.0.0
+model: claude-opus-5
+input_usd_per_mtok: 5.00
+output_usd_per_mtok: 25.00
+as_of: 2026-06-24
+source: Anthropic first-party API list price (claude-api model table, cached 2026-06-24)

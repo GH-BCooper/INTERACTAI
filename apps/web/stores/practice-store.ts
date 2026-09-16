@@ -13,6 +13,7 @@ export type ConnectionUiState =
   | "connected"
   | "reconnecting"
   | "session_busy"
+  | "at_capacity"
   | "ended";
 
 export type CaptionSpeaker = "user" | "persona" | null;

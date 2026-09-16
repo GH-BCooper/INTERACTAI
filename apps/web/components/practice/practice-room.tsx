@@ -185,6 +185,15 @@ export function PracticeRoom({
     );
   }
 
+  if (connection === "at_capacity") {
+    return (
+      <FullPageMessage
+        title="At capacity, try again shortly"
+        body="Every practice slot on this server is in use. Nothing was recorded; try again in a minute."
+      />
+    );
+  }
+
   if (!session || !scenario) {
     return <FullPageMessage title="Loading your session…" />;
   }

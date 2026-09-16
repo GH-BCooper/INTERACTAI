@@ -1,0 +1,16 @@
+# Phase 6 TASK 6.4a — never send weights, audio, secrets or local envs to the build context.
+.git
+.env
+.env.*
+!.env.example
+**/.venv
+**/node_modules
+**/.next
+**/__pycache__
+**/*.pyc
+models/
+data/
+wandb/
+kaggle.json
+tests/
+apps/web/tsconfig.tsbuildinfo

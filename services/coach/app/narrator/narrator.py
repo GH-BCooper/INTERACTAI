@@ -98,9 +98,7 @@ def _build_messages(
     ]
 
 
-def _valid_turn_ids(
-    highlight_turn_id: str | None, lowlight_turn_id: str | None
-) -> set[str]:
+def _valid_turn_ids(highlight_turn_id: str | None, lowlight_turn_id: str | None) -> set[str]:
     return {t for t in (highlight_turn_id, lowlight_turn_id) if t is not None}
 
 
@@ -129,9 +127,7 @@ def _template_fallback(
         f"the most room to grow was {bottom[0].name} ({bottom[0].score}/5)." + sample_note
     )
     strengths = [f"{c.name} scored {c.score}/5." for c in top]
-    growth_areas = [
-        f"{c.name} scored {c.score}/5 — the most room to improve here." for c in bottom
-    ]
+    growth_areas = [f"{c.name} scored {c.score}/5 — the most room to improve here." for c in bottom]
     return NarrativeResult(
         summary=summary,
         strengths=strengths,

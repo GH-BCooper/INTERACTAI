@@ -174,6 +174,9 @@ class SessionRegistry:
     def __len__(self) -> int:
         return len(self._runtimes)
 
+    def session_ids(self) -> list[std_uuid.UUID]:
+        return list(self._runtimes)
+
     def get(self, session_id: std_uuid.UUID) -> SessionRuntime | None:
         return self._runtimes.get(session_id)
 
@@ -233,3 +236,20 @@ class SessionRegistry:
         except asyncio.CancelledError:
             pass
         self._sweeper_task = None
+
+
+async def drain_sessions(
+    registry: SessionRegistry, finalizer: Finalizer, *, timeout_s: float
+) -> list[std_uuid.UUID]:
+    """Phase 6 TASK 6.4b: finalise every runtime still held on SIGTERM — concurrently, bounded
+    by `timeout_s` so a hung upload cannot block the process forever. Returns the session ids
+    that did NOT finish finalising in time (logged by the caller; an empty list is a clean
+    drain)."""
+    ids = registry.session_ids()
+    tasks = {sid: asyncio.create_task(registry.finalize(sid, finalizer)) for sid in ids}
+    if not tasks:
+        return []
+    _done, pending = await asyncio.wait(tasks.values(), timeout=timeout_s)
+    for task in pending:
+        task.cancel()
+    return [sid for sid, task in tasks.items() if task in pending]

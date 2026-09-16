@@ -67,7 +67,7 @@ export default function PrivacySettingsPage() {
   async function doDelete() {
     await deleteMe.mutateAsync();
     clearAuth();
-    router.replace("/");
+    router.replace("/signin");
   }
 
   return (

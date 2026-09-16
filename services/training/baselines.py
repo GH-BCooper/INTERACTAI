@@ -30,9 +30,7 @@ def majority_class(
     """
     majority: dict[str, float] = {}
     for criterion in criteria:
-        train_scores = [
-            round(ex.scores[criterion]) for ex in train if criterion in ex.scores
-        ]
+        train_scores = [round(ex.scores[criterion]) for ex in train if criterion in ex.scores]
         if not train_scores:
             majority[criterion] = 3.0  # rubric midpoint - no training signal for this criterion
             continue

@@ -21,7 +21,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     let cancelled = false;
     void bootstrapAuth().then((ok) => {
       if (cancelled) return;
-      if (!ok) router.replace("/");
+      if (!ok) router.replace("/signin");
     });
     return () => {
       cancelled = true;

@@ -69,7 +69,7 @@ class TestScorerSeam:
             get_scorer()
 
     def test_both_implementations_share_the_same_call_shape(self) -> None:
-        """"No caller may know which is in use" — proven structurally: both classes expose the
+        """ "No caller may know which is in use" — proven structurally: both classes expose the
         exact same `score`/`score_batch` coroutine methods a caller can await identically."""
         assert hasattr(PromptedScorer, "score") and hasattr(PromptedScorer, "score_batch")
         assert hasattr(FinetunedScorer, "score") and hasattr(FinetunedScorer, "score_batch")

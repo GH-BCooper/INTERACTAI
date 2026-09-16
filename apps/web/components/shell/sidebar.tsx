@@ -2,7 +2,9 @@
 
 import { clsx } from "clsx";
 import {
+  Activity,
   ClipboardCheck,
+  FlaskConical,
   History,
   LayoutDashboard,
   LayoutGrid,
@@ -27,7 +29,12 @@ const NAV_ITEMS = [
 // docs/phase-5-BUILD.md TASK 5.3a: "/app/annotate (admin only)." Only ever rendered when
 // `isAdmin` is true — the route itself re-checks server-side regardless (AdminUser dependency),
 // this is purely so a non-admin never sees a link to a tool that would 403 them.
-const ADMIN_NAV_ITEM = { href: "/app/annotate", label: "Annotate", icon: ClipboardCheck };
+const ADMIN_NAV_ITEMS = [
+  { href: "/app/annotate", label: "Annotate", icon: ClipboardCheck },
+  // Phase 6 TASK 6.1/6.2.
+  { href: "/app/observability", label: "Observability", icon: Activity },
+  { href: "/app/evals", label: "Evaluations", icon: FlaskConical },
+];
 
 interface SidebarProps {
   practiceMinutesThisWeek: number;
@@ -41,7 +48,7 @@ export function Sidebar({ practiceMinutesThisWeek, isAdmin }: SidebarProps) {
   const collapsed = useShellStore((s) => s.sidebarCollapsed);
   const toggle = useShellStore((s) => s.toggleSidebar);
   const pathname = usePathname();
-  const navItems = isAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
+  const navItems = isAdmin ? [...NAV_ITEMS, ...ADMIN_NAV_ITEMS] : NAV_ITEMS;
 
   return (
     <nav

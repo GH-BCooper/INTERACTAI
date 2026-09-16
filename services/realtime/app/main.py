@@ -45,7 +45,7 @@ from .persona.opening import deliver_opening_line
 from .persona.prompt import PersonaContext, build_persona_context_from_brief
 from .persona.question_plan import generate_question_plan
 from .schemas.ws import Pong, Ready, ServerMachineState, SessionClosed, StateChange, WsError
-from .session import SessionRegistry, SessionRuntime
+from .session import SessionRegistry, SessionRuntime, drain_sessions
 from .sink import WsTurnSink
 from .timeouts import run_state_watchdog
 from .tts.piper import synthesize_chunk
@@ -67,6 +67,7 @@ class ModelRegistry:
         self.vad_session: Any | None = None
         self.asr_model: Any | None = None
         self.resources: PipelineResources | None = None
+        self.loading = True
 
     @property
     def ready(self) -> bool:
@@ -77,23 +78,25 @@ class ModelRegistry:
         )
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    configure_logging()
+async def _load_models(models: ModelRegistry) -> None:
+    """Phase 6 TASK 6.4b: runs as a background task, not inline in `lifespan`, so `/health`
+    (liveness) answers while Whisper and Piper are still loading — a slow model load must not
+    read as a dead process. `/health/ready` stays 503 until every handle below is resident."""
     settings = get_settings()
-
-    models = ModelRegistry()
     try:
         from .vad.silero import load_vad_session
 
-        models.vad_session = load_vad_session(settings.vad_model_path)
+        models.vad_session = await asyncio.to_thread(load_vad_session, settings.vad_model_path)
     except Exception:
         logger.warning("vad_not_loaded")
     try:
         from .asr.whisper import load_asr_model
 
-        models.asr_model = load_asr_model(
-            settings.asr_model, compute_type=settings.asr_compute_type, device=settings.asr_device
+        models.asr_model = await asyncio.to_thread(
+            load_asr_model,
+            settings.asr_model,
+            compute_type=settings.asr_compute_type,
+            device=settings.asr_device,
         )
     except Exception:
         logger.warning("asr_not_loaded")
@@ -136,7 +139,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     except Exception:
         logger.exception("pipeline_resources_not_loaded")
 
+    models.loading = False
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    configure_logging()
+    settings = get_settings()
+
+    models = ModelRegistry()
     app.state.models = models
+    app.state.draining = False
+    load_task = asyncio.create_task(_load_models(models))
     app.state.registry = SessionRegistry(
         resume_grace_s=settings.resume_grace_s, sweep_interval_s=settings.sweeper_interval_s
     )
@@ -159,7 +173,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     try:
         yield
     finally:
+        # Phase 6 TASK 6.4b — graceful shutdown on SIGTERM. Uvicorn has already stopped
+        # accepting sockets and closed the live ones (code 1012) by the time this runs; every
+        # runtime still in the registry is finalised here — recording flushed and uploaded,
+        # session row closed, report job enqueued — before the process exits.
+        app.state.draining = True
+        load_task.cancel()
         await app.state.registry.stop_sweeper()
+        undrained = await drain_sessions(
+            app.state.registry, _finalize, timeout_s=settings.shutdown_drain_timeout_s
+        )
+        logger.info("shutdown_drained", undrained=[str(sid) for sid in undrained])
         if app.state.arq_pool is not None:
             await app.state.arq_pool.aclose()
 
@@ -186,7 +210,7 @@ async def health() -> dict[str, str]:
 @app.get("/health/ready")
 async def health_ready() -> JSONResponse:
     models: ModelRegistry = app.state.models
-    if models.ready:
+    if models.ready and not app.state.draining:
         return JSONResponse({"status": "ok"}, status_code=200)
     return JSONResponse({"status": "not_ready"}, status_code=503)
 
@@ -817,6 +841,18 @@ async def ws_endpoint(websocket: WebSocket, token: str | None = None) -> None:
     models: ModelRegistry = websocket.app.state.models
     settings = get_settings()
     redis = get_redis_pool()
+
+    if not models.ready:
+        # Still loading (liveness up, readiness 503). A balancer honouring readiness never
+        # routes here; one that does not gets a clear retryable close, not a crash mid-session.
+        await websocket.close(code=1013, reason="ORCHESTRATION_MODELS_LOADING")
+        return
+
+    if websocket.app.state.draining:
+        # Shutting down: refuse new sockets rather than start a session this process will not
+        # live to finish. 1012 = "service restart"; the client's reconnect path handles it.
+        await websocket.close(code=1012, reason="ORCHESTRATION_DRAINING")
+        return
 
     async with get_sessionmaker()() as db:
         decision = await decide_handshake(

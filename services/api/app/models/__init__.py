@@ -5,7 +5,7 @@ from .base import Base
 from .consent import Consent
 from .content import Persona, Rubric, RubricCriterion, Scenario
 from .jobs import FailedJob
-from .observability import LatencyEvent, ModelCall
+from .observability import DeploymentEvent, LatencyEvent, ModelCall
 from .pre_label import PreLabel
 from .scoring import Report, SessionScore
 from .session import Session
@@ -20,6 +20,7 @@ __all__ = [
     "Consent",
     "DatasetMember",
     "DatasetRevision",
+    "DeploymentEvent",
     "EvalRun",
     "FailedJob",
     "LatencyEvent",

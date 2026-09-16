@@ -24,6 +24,7 @@ export type ConnectionStatus =
   | "open"
   | "reconnecting"
   | "session_busy"
+  | "at_capacity"
   | "closed"
   | "fatal_error";
 
@@ -65,6 +66,9 @@ export type WebSocketFactory = (url: string) => WebSocketLike;
 
 const CLOSE_CODE_SESSION_BUSY_OR_TOKEN_REUSED = 4409;
 const CLOSE_REASON_SESSION_BUSY = "ORCHESTRATION_SESSION_BUSY";
+// docs/03-realtime-protocol.md: "Concurrent-session cap exceeded | 4429 | RATE_LIMITED". Phase 6
+// TASK 6.4b: at capacity is a clear, terminal "try again shortly", never a silent retry loop.
+const CLOSE_CODE_RATE_LIMITED = 4429;
 
 export class RealtimeConnection {
   private ws: WebSocketLike | null = null;
@@ -150,6 +154,10 @@ export class RealtimeConnection {
     }
     if (code === CLOSE_CODE_SESSION_BUSY_OR_TOKEN_REUSED && reason === CLOSE_REASON_SESSION_BUSY) {
       this.setStatus("session_busy");
+      return;
+    }
+    if (code === CLOSE_CODE_RATE_LIMITED) {
+      this.setStatus("at_capacity");
       return;
     }
     if (code === 1000) {

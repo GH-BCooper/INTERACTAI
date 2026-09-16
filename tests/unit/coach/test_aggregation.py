@@ -58,7 +58,7 @@ class TestAggregateCriterion:
         assert result.confidence == round(min(1.0, 1.7 / 2), 4)
 
     def test_below_min_turns_with_signal_is_not_enough_signal(self) -> None:
-        """"Criteria with insufficient turn-level signal aggregate to not enough signal rather
+        """ "Criteria with insufficient turn-level signal aggregate to not enough signal rather
         than to a partial average over two turns" — here, over *one*."""
         rows = [_row(5.0, 1.0)]
         result = aggregate_criterion(
