@@ -30,7 +30,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-dvh w-full overflow-hidden">
-      <Sidebar practiceMinutesThisWeek={me.practice_minutes_this_week} />
+      <Sidebar
+        practiceMinutesThisWeek={me.practice_minutes_this_week}
+        isAdmin={me.user.is_admin}
+      />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar me={me} />
         <main className="flex-1 overflow-y-auto">{children}</main>

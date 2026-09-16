@@ -33,6 +33,7 @@ from .tables import (
     scenarios,
     session_scores,
     sessions,
+    shadow_scores,
     turn_metrics,
     turn_scores,
     turns,
@@ -123,6 +124,50 @@ async def upsert_turn_score(
             "evidence_spans": stmt.excluded.evidence_spans,
             "model_version": stmt.excluded.model_version,
             "rationale": stmt.excluded.rationale,
+            "updated_at": now,
+        },
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+
+async def insert_shadow_score(
+    db: AsyncSession,
+    *,
+    session_id: std_uuid.UUID,
+    turn_id: std_uuid.UUID,
+    criterion_key: str,
+    score: int | None,
+    confidence: float,
+    model_version: str,
+) -> None:
+    """docs/phase-5-BUILD.md TASK 5.5d — see shadow_scores' unique constraint
+    (turn_id, criterion_key, model_version): unlike turn_scores, a shadow score genuinely does
+    coexist across model_versions, since the whole point is comparing them over time. Idempotent
+    per (turn, criterion, model_version) — a retried job overwrites its own prior attempt rather
+    than accumulating duplicates.
+    """
+    now = datetime.now(UTC)
+    stmt = insert(shadow_scores).values(
+        id=uuid7(),
+        created_at=now,
+        updated_at=now,
+        session_id=session_id,
+        turn_id=turn_id,
+        criterion_key=criterion_key,
+        score=score,
+        confidence=confidence,
+        model_version=model_version,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[
+            shadow_scores.c.turn_id,
+            shadow_scores.c.criterion_key,
+            shadow_scores.c.model_version,
+        ],
+        set_={
+            "score": stmt.excluded.score,
+            "confidence": stmt.excluded.confidence,
             "updated_at": now,
         },
     )

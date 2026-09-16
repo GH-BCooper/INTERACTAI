@@ -16,6 +16,17 @@ the dashboard, scenario library, onboarding, progress and settings), consent tra
 scrubbing. Phase 4's Task 4.6 (recruited usability sessions with real participants) is not a
 coding task and has not been run.
 
+**Scoring today runs on the prompted baseline** (`services/coach/app/scorer/prompted.py`) — a
+frontier model given the rubric's own anchor descriptors and asked for evidence-verified scores.
+This is the baseline, not the fine-tune: Phase 5's dataset-and-fine-tune infrastructure (schema,
+dataset builder, admin annotation tool, inter-annotator-agreement computation, the DeBERTa-v3
+multi-task training pipeline, the evaluation harness, the model registry, shadow mode) is fully
+built and has been run live against real Postgres — see `docs/PHASE5-WALKTHROUGH.md`. It has not
+yet been run against real recruited-session data or a real second human annotator, because
+neither exists in the environment this was built in. `docs/RESULTS.md` reports exactly what has
+and hasn't been measured; the walkthrough is the concrete next-steps document for turning the
+infrastructure into a real trained scorer with a published human-agreement ceiling.
+
 ## Quick start
 
 ```bash

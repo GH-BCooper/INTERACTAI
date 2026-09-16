@@ -16,6 +16,42 @@ export interface UserOut {
   avatar_url: string | null;
   created_at: string;
   onboarded_at: string | null;
+  is_admin: boolean;
+}
+
+export interface AnnotationQueueItem {
+  turn_id: string;
+  session_id: string;
+  question: string;
+  answer_text: string;
+  answer_is_scrubbed: boolean;
+  audio_url: string | null;
+  audio_start_ms: number;
+  audio_end_ms: number;
+  criterion_key: string;
+  criterion_name: string;
+  anchor_descriptors: Record<string, string>;
+  split: string;
+  double_labeled: boolean;
+  pre_label_score: number | null;
+}
+
+export interface AnnotationSubmitOut {
+  id: string;
+  turn_id: string;
+  criterion_key: string;
+  round: number;
+  score: number;
+  created_at: string;
+}
+
+export interface AnnotationProgress {
+  dataset_revision_hash: string | null;
+  total_candidate_pairs: number;
+  labeled_pairs: number;
+  double_labeled_target: number;
+  double_labeled_with_two_annotators: number;
+  disagreements_pending_adjudication: number;
 }
 
 export type Goal = "job_interview" | "technical_interview" | "salary_negotiation";

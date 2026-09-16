@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     confidence_threshold: float = 0.6  # Task 2.5e: below this, "not enough signal", never a number
     scorer_impl: str = "prompted"  # "prompted" | "finetuned" (Phase 5) — CS interface seam
 
+    # ── Shadow mode (docs/phase-5-BUILD.md TASK 5.5d / CS-12) ────────────────────────────────
+    # "The prompted baseline runs alongside the fine-tune on a sampled fraction (10%) of live
+    # turns... a live measurement, not a historical one." Written to shadow_scores, not
+    # turn_scores (docs/decisions/0021). 0.0 disables shadow mode entirely.
+    shadow_sample_rate: float = 0.10
+    shadow_scorer_impl: str = "prompted"
+
     max_job_tries: int = 3  # Task 2.2d: after this many, write a failed_jobs record
 
 

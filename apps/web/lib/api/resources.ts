@@ -1,6 +1,9 @@
 import { apiFetch } from "./client";
 import type {
   AnnotationOut,
+  AnnotationProgress,
+  AnnotationQueueItem,
+  AnnotationSubmitOut,
   DashboardOut,
   Difficulty,
   MeOut,
@@ -126,4 +129,25 @@ export const sessions = {
     apiFetch<AnnotationOut>(`/sessions/${id}/annotations`, { method: "POST", body }),
   retry: (id: string, body: { turn_id: string }) =>
     apiFetch<SessionOut>(`/sessions/${id}/retry`, { method: "POST", body }),
+};
+
+// docs/phase-5-BUILD.md TASK 5.3 — the admin-only annotation tool. Separate from
+// `sessions.annotate` above (Task 3.4e's self-serve, per-session control): this queue spans
+// every session, shows anchor descriptors, audio and (train-split-only) pre-labels.
+export const adminAnnotate = {
+  getQueue: (params?: { limit?: number; preLabelled?: boolean }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.preLabelled) qs.set("pre_labelled", "true");
+    const s = qs.toString();
+    return apiFetch<AnnotationQueueItem[]>(`/admin/annotate/queue${s ? `?${s}` : ""}`);
+  },
+  submit: (body: {
+    turn_id: string;
+    criterion_key: string;
+    score: number;
+    notes?: string | null;
+    pre_label_score?: number | null;
+  }) => apiFetch<AnnotationSubmitOut>("/admin/annotate/submit", { method: "POST", body }),
+  getProgress: () => apiFetch<AnnotationProgress>("/admin/annotate/progress"),
 };

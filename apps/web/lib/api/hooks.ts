@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  adminAnnotate,
   me,
   personas,
   rubrics,
@@ -220,5 +221,30 @@ export function useAnnotate(sessionId: string) {
 export function useRetryQuestion(sessionId: string) {
   return useMutation({
     mutationFn: (turnId: string) => sessions.retry(sessionId, { turn_id: turnId }),
+  });
+}
+
+// docs/phase-5-BUILD.md TASK 5.3 — admin annotation tool.
+export function useAdminAnnotationQueue(params?: { limit?: number; preLabelled?: boolean }) {
+  return useQuery({
+    queryKey: ["admin-annotate", "queue", params?.limit, params?.preLabelled],
+    queryFn: () => adminAnnotate.getQueue(params),
+  });
+}
+
+export function useAdminAnnotationProgress() {
+  return useQuery({
+    queryKey: ["admin-annotate", "progress"],
+    queryFn: () => adminAnnotate.getProgress(),
+  });
+}
+
+export function useAdminAnnotationSubmit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: adminAnnotate.submit,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-annotate"] });
+    },
   });
 }

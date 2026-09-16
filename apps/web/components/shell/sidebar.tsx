@@ -2,6 +2,7 @@
 
 import { clsx } from "clsx";
 import {
+  ClipboardCheck,
   History,
   LayoutDashboard,
   LayoutGrid,
@@ -23,17 +24,24 @@ const NAV_ITEMS = [
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 
+// docs/phase-5-BUILD.md TASK 5.3a: "/app/annotate (admin only)." Only ever rendered when
+// `isAdmin` is true — the route itself re-checks server-side regardless (AdminUser dependency),
+// this is purely so a non-admin never sees a link to a tool that would 403 them.
+const ADMIN_NAV_ITEM = { href: "/app/annotate", label: "Annotate", icon: ClipboardCheck };
+
 interface SidebarProps {
   practiceMinutesThisWeek: number;
+  isAdmin: boolean;
 }
 
 /** Task 3.1: "Collapsible left sidebar with primary nav and a practice-minutes-this-week meter
  * pinned at the bottom." Not present on the practice room route — this component only ever
  * renders inside app/app/(shell)/layout.tsx. */
-export function Sidebar({ practiceMinutesThisWeek }: SidebarProps) {
+export function Sidebar({ practiceMinutesThisWeek, isAdmin }: SidebarProps) {
   const collapsed = useShellStore((s) => s.sidebarCollapsed);
   const toggle = useShellStore((s) => s.toggleSidebar);
   const pathname = usePathname();
+  const navItems = isAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
   return (
     <nav
@@ -56,7 +64,7 @@ export function Sidebar({ practiceMinutesThisWeek }: SidebarProps) {
       </div>
 
       <ul className="flex flex-1 flex-col gap-1 px-2 py-2">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active = item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (

@@ -72,6 +72,11 @@ class User(UUIDPk, TimestampMixin, Base):
     # ── Task 4.3 — Onboarding ────────────────────────────────────────────────────────────────
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # ── Task 5.3 — the annotation tool is admin-only. No role system exists anywhere else in
+    # this project; a single boolean is the whole of what "admin" means here, granted only via
+    # scripts/grant_admin.py (docs/decisions/0019) — never through a public endpoint.
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
 
 class Profile(UUIDPk, TimestampMixin, Base):
     """1:1 with users. `resume_text` is deletable independently of the profile row (granular

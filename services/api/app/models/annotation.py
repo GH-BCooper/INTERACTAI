@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import uuid as std_uuid
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -36,3 +44,10 @@ class Annotation(UUIDPk, TimestampMixin, Base):
     round: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
+    # docs/phase-5-BUILD.md TASK 5.3d: "Pre-labelled-then-corrected turns are tagged so their
+    # effect can be ablated." pre_label_score is what the interface showed *before* the
+    # annotator's own score above was recorded — never equal to score by default-accept, since
+    # the interface requires an explicit action even to keep the suggested value (Task 5.3d:
+    # "the interface must not default to accept"). Both NULL for an ordinary blind annotation.
+    pre_labelled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    pre_label_score: Mapped[int | None] = mapped_column(Integer)

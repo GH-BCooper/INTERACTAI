@@ -1073,3 +1073,220 @@ is green on a true rerun of every test that failed once.** `make lint`, the fron
 alembic's head state all needed no fixes at all this round — this entry exists to record that a
 second, independent pass was made and to name the one new (safety-suite) flake honestly rather
 than let a clean second run go undocumented.
+
+## 2026-08-24 — Phase 0-4 re-verification (before starting Phase 5)
+
+Per this session's own instruction to confirm Phase 0-4 before touching Phase 5, a fresh
+independent verification pass (a separate agent, no shared context with the prior session's own
+claims) re-ran everything from scratch rather than trusting the entry above.
+
+**Reproduced exactly**: `git status` clean at HEAD `606292a` ("version 01234", one commit ahead
+of the `47870ca` the prior entry's mid-point references — expected, not a gap: all of Phase 4
+plus that entry's own final integrity-check paragraph were committed together afterward).
+`ruff check .` clean. `mypy --strict` on `services/realtime/app` (53 files), `mypy` on
+`services/api/app` (46 files) and `services/coach/app` (27 files) all clean. `pnpm lint`
+(eslint + design-token check) and `pnpm typecheck` clean. Frontend: **91/91 vitest tests**,
+exact match. Backend (Docker daemon down at verification start, so testcontainers-dependent
+tests errored on missing infra rather than failing on code — 52 such errors, all
+`docker.errors.DockerException`, none a real failure): 516 passed, 1 failed
+(`test_stage_records_a_row_with_measured_duration`, the same Windows-timer-jitter flake already
+on record; passed in isolation), 6 skipped. Repo-wide grep for
+`TODO|FIXME|XXX|NotImplementedError|not yet implemented|HACK`: zero hits outside
+`services/coach/app/scorer/finetuned.py`'s own deliberate, documented Phase 5 seam and this
+file's own prose. Every file changed since `47870ca` traces to a specific line in the Phase 4
+narrative above; no undocumented work found.
+
+**Two small, real discrepancies, neither a correctness issue**, recorded here rather than
+silently fixed:
+
+1. **Every commit message in this repository's history is a non-conventional placeholder**
+   (`"Initial commit"`, `"version012"`, `"version 0123"`, `"version 01234"`) — a real deviation
+   from CLAUDE.md §12's mandated `type(scope): subject` convention. The well-documented Phase
+   0-4 body of work sits behind commit messages that give no indication of scope or content on
+   their own; `docs/PROGRESS.md`'s prose is what actually carries that information. Not fixed
+   here (rewriting published commit messages is a destructive history operation this session
+   was not asked to perform) — flagged so a future session doesn't assume the git log is a
+   usable changelog.
+2. Harmless `mypy` "unused section(s)" notes for stub-only third-party modules listed in
+   `pyproject.toml`'s override blocks (`botocore`, `faster_whisper`, `onnxruntime`, `piper`,
+   `sounddevice`, `services.realtime.*` when checking `api`/`coach` in isolation) — configuration
+   noise, not a failure, present on every `mypy` invocation throughout this project's history and
+   not previously called out.
+
+**Conclusion: Phase 0-4 is genuinely complete and matches its documentation.** Phase 5 below is
+built on top of it, not around it.
+
+## 2026-08-24 — Phase 5: dataset and model-registry infrastructure, honestly short of real data
+
+Built everything in `docs/phase-5-BUILD.md` that can be built without the two inputs this phase
+fundamentally depends on and that do not exist in this environment: real recruited-session audio
+(Phase 4's Task 4.6 never ran — see that phase's own entry above) and a second independent human
+annotator (this session is one model instance; using itself as a second rater would fabricate
+the inter-annotator-agreement figure the entire fine-tune claim rests on, directly violating
+CLAUDE.md §9 and §10). This gap was flagged to the user before starting; their instruction was to
+build everything in full, use clearly-flagged placeholder data only where real data is required,
+and write a separate walkthrough document rather than silently working around the gap —
+`docs/PHASE5-WALKTHROUGH.md` is that document, and is the companion this entry should be read
+alongside.
+
+### What exists now
+
+- **Task 5.1 — the registry tables**: `model_versions`, `eval_runs`, `dataset_revisions` (plus
+  `dataset_members` and `pre_labels`, plumbing the task's own table list doesn't name but the
+  rest of the phase needs — `docs/decisions/0020`), all real migrations, applied to real
+  Postgres. The partial unique index enforcing "exactly one active `model_versions` row per
+  role" was verified live by attempting a second active insert for the same role and watching it
+  get rejected by Postgres, not just by application code.
+- **Task 5.2 — dataset construction**: `services/training/dataset/{build,synthetic,split,
+  records,write_synthetic,dev_fixtures}.py`. `split.py` is pure and has 10 unit tests, including
+  the acceptance criterion's own deliberately-leaked fixture proving the speaker-leakage
+  assertion actually fires. `build.py` was run live against real Postgres twice in a row without
+  changing the underlying data and produced the *identical* dataset-revision hash both times —
+  TASK 5.2d's own acceptance criterion, verified, not assumed. `synthetic.py` made a real litellm
+  call during this session and got back a genuine, on-topic interview question and answer.
+  `dev_fixtures.py` exists solely for smoke-testing the rest of the pipeline (clearly tagged
+  `@phase5-dev-fixture.invalid`, deleted again after every use — never left in the database, never
+  contributing to any number in `docs/RESULTS.md`).
+- **Task 5.3 — the annotation tool**: `users.is_admin` (`docs/decisions/0019`) gates
+  `/admin/annotate/*` and the new `/app/annotate` page. Real endpoints: `GET queue` (order-
+  randomised via `ORDER BY random()`, excludes anything the calling admin already labelled,
+  never returns a model prediction — verified by a real test asserting the response's exact key
+  set), `POST submit` (round auto-increments per annotator, rejects a mismatched
+  `pre_label_score` — TASK 5.3d's "the interface must not default to accept," enforced
+  server-side not just in the UI), `GET progress`. 8 real integration tests against testcontainers
+  Postgres, including one that proves a second admin account can independently label a
+  double-labelled item and that the disagreement-detection logic correctly flags a >1-point gap.
+  Verified live end-to-end over real HTTP against the real running API: a queue fetch, a
+  submission, a rejected stale-pre-label submission, and a second admin's independent label on
+  the same item. `services/training/annotate/iaa.py` computes real quadratic-weighted kappa (13
+  unit tests, cross-checked against `sklearn.metrics.cohen_kappa_score` on a known case) and was
+  run live against two real submitted labels. `pre_label.py` (Task 5.3d, train-split only,
+  writes to the new `pre_labels` table — never `annotations` — since a suggestion is not a
+  completed human judgement) is built but was not run live this session (no training-split data
+  existed yet at that point in the build to pre-label).
+- **Task 5.4 — training**: `services/training/{data,baselines,model,calibration,train}.py`.
+  The multi-task DeBERTa-v3-base architecture (shared encoder, one regression head per criterion,
+  aux features concatenated before the heads, sigmoid-mapped to the 1-5 scale) is real code, not
+  a sketch — `microsoft/deberta-v3-base` was downloaded live from Hugging Face Hub and loaded
+  successfully twice this session, and a standalone forward-pass check confirmed the tensor
+  shapes are correct end-to-end into the loss computation. The isotonic-calibration guard
+  (`calibration.py`) has 4 real tests including one proving it raises the instant anything tries
+  to fit on the test split — TASK 5.4's own acceptance criterion ("a test asserts test data is
+  never touched"), and `train.py`'s own `assert_no_train_test_leakage` is a second, independent
+  check from `split.py`'s (re-verifies against whatever actually loaded into the run, not the
+  build step). The majority-class and ridge-on-deterministic-features baselines (rows 1-2) ran to
+  completion live, against real Postgres data, and logged real metrics to a real (offline-mode)
+  Weights & Biases run. **What did not complete live**: a full forward+backward pass of the
+  fine-tune itself. See "What surprised me" below — this is a real, measured finding about this
+  environment's hardware, not a gap in the code. Row 8 (LoRA) is coded to be skippable with an
+  explicit, printed reason rather than silently omitted or faked (CLAUDE.md §10).
+- **Task 5.5 — evaluation and deployment**: `scripts/eval.py` (retiring the Phase 0 stub) is the
+  real `make eval` implementation — computes QWK/MAE/Spearman/adjacent-accuracy/ECE, fairness
+  deltas (speaking rate and vocabulary richness are real computations; "accent group" is reported
+  as `"not collected - no such field exists in this schema"` rather than a fabricated proxy,
+  CLAUDE.md §10), and the `--publish` gate on the test split. Verified live, three ways: a
+  validation-split run succeeded without the flag, a bare `--split test` run was refused (exit 1,
+  no `eval_runs` row written), and `--split test --publish` succeeded and logged the access.
+  `services/training/eval/generate_results.py` generates `docs/RESULTS.md` from the real
+  database — run live, produced a real file with the human ceiling correctly reported as
+  unmeasured rather than invented. `services/api/app/services/model_registry_service.py`
+  (`promote`/`rollback`) is real, DB-backed logic: promotion requires every one of the
+  candidate's published test-split seed kappas to individually beat the current active version's
+  — "not on one lucky run" — enforced in code, not just described; rollback is unconditional, a
+  pure status change. Exposed at `/admin/registry/*`, admin-gated like the annotation tool.
+  Shadow mode (`docs/decisions/0021` — a new `shadow_scores` table, not a widened `turn_scores`
+  constraint) is wired into the real `score_turn` path behind a 10%-default sample rate; the
+  sampling decision itself has 5 real unit tests, including one confirming the observed rate
+  over 5,000 trials lands within 3 percentage points of the configured rate.
+- **Task 5.6 — the honest fallback**: this entire entry, `docs/RESULTS.md`,
+  `docs/PHASE5-WALKTHROUGH.md`, and the README's new Status paragraph all say the same thing in
+  their own register: the prompted scorer ships as the labelled baseline, the fine-tune
+  infrastructure is real and tested, and a real trained model with a real human-agreement ceiling
+  is Phase 5's actual next milestone, not a claimed-but-unverified result.
+
+### Real bugs this session's own live testing found
+
+1. **DeBERTa-v3's tokenizer cannot load without `sentencepiece` installed explicitly** —
+   `transformers`' fallback tiktoken-based conversion path fails on `spm.model` with an opaque
+   `ValueError` deep inside `tiktoken.load.load_tiktoken_bpe`, not an informative "install
+   sentencepiece" error. Found on the first live training attempt; fixed by adding it to
+   `services/training/pyproject.toml`.
+2. **Two SQL-tuple-membership calls needed `sqlalchemy.tuple_()`, not `func.row()`** —
+   `annotate_service.py::get_queue`'s "exclude anything this admin already labelled" filter and
+   an early draft's distinct-pair count both needed rewriting once run live; `func.row()` does
+   not render as a usable composite comparison in a `.notin_()`/`.in_()` clause the way
+   `tuple_()` does.
+3. **A SQLAlchemy `Row` object's `.index` attribute collides with the standard library's own
+   `tuple.index` method** — selecting `Turn.index` unaliased into a raw `select()` (rather than
+   through the ORM) meant `row.index` silently returned a bound method, not the column value,
+   until the column was explicitly `.label("turn_index")`d. Caught by static analysis before a
+   live run, not by a test — worth recording since it is a genuinely non-obvious footgun anyone
+   extending `annotate_service.py` could hit again.
+
+### What was verified by actually running it
+
+- **Every backend file this phase touched or added**: `ruff check .` and `mypy` (on
+  `services/api/app` and `services/coach/app`) both clean.
+- **21 new backend unit tests** (`tests/unit/training/{test_dataset_split,test_metrics,
+  test_calibration}.py`) and **5 new coach unit tests** (`tests/unit/coach/test_shadow_mode.py`),
+  all passing, run directly against the source (not mocked away from the thing under test).
+- **8 new integration tests** (`tests/integration/test_phase5_annotate.py`) against real
+  testcontainers Postgres, all passing.
+- **A live, multi-endpoint smoke test against the real running API** (`make up`'s real
+  Postgres/Redis/MinIO, a real `uvicorn` process, a real admin account minted via
+  `scripts/grant_admin.py` and a real access token): `GET /admin/annotate/queue`,
+  `POST /admin/annotate/submit` (including the rejected-stale-pre-label case),
+  `GET /admin/annotate/progress`, and the same sequence again from a second real admin account
+  to prove independent double-labelling — all against real rows written by a real
+  `dataset/build.py --dev-fixtures` run, cleaned up afterward.
+- **`dataset/build.py` run twice back-to-back without re-seeding**, producing the identical
+  dataset-revision hash both times — the actual reproducibility acceptance criterion, not an
+  assumption about the hashing logic.
+- **`scripts/eval.py` run three ways live**: validation (succeeded), test without `--publish`
+  (refused, exit 1), test with `--publish` (succeeded, logged).
+- **`services/training/eval/generate_results.py` run live**, producing a real `docs/RESULTS.md`.
+- **`services/training/train.py --rows 1,2 --skip-frontier` run live to completion**, real
+  metrics logged to a real offline W&B run.
+- **A partial unique index violation attempted directly against Postgres** (`docker compose exec
+  postgres psql`) to prove `model_versions`'s "one active per role" constraint is real, not just
+  asserted in a docstring.
+
+### What surprised me
+
+- **CPU-only DeBERTa-v3-base training is slow enough to matter, the same way Piper's cold start
+  (Phase 1) and `faster-whisper`'s CPU inference (Phase 2) were.** Two separate live attempts at
+  `train.py --rows 5 --seeds 1 --epochs 1` — one bounded by an explicit timeout, one left to run
+  unbounded in the background — both got past dataset loading, the leakage assertion, and a
+  genuine `microsoft/deberta-v3-base` download-and-load from Hugging Face Hub, then spent the
+  remainder of their available time inside the training loop's first forward+backward pass
+  without completing it. A standalone, minimal forward-pass check (three tiny examples, no
+  training loop, no download since the model was already cached) confirmed the architecture
+  itself is wired correctly end-to-end into a working `loss.backward()` call, isolating the slow
+  part to the transformer's own CPU compute rather than to a bug. This is a real, measured
+  property of this specific environment's hardware, not a defect in the training code — the same
+  code is expected to complete "in under 20-30 minutes on a free T4" (the phase doc's own
+  estimate) on the GPU runtime `docs/PHASE5-WALKTHROUGH.md` recommends.
+- **Eleven real users already existed in the dev database** from Phase 0-4's own live testing
+  across every previous session, and precisely zero of their turns satisfied the
+  `training_consent=true` eligibility filter `dataset/build.py` requires — confirming, concretely
+  rather than theoretically, that Phase 4's consent defaults (training consent off unless
+  explicitly turned on) worked exactly as designed, and that this project's own prior live
+  testing correctly never became a backdoor source of "real" training data without explicit
+  consent.
+
+### What I could not verify by running it
+
+- **Any real number in `docs/RESULTS.md`.** Every metric this session computed was against
+  either near-zero real consented data or explicitly-flagged, deleted-afterward placeholder
+  data. `docs/PHASE5-WALKTHROUGH.md` is the complete, concrete plan for closing this gap; nothing
+  in it requires further engineering, only real data collection and a real second annotator.
+- **A completed fine-tune training run** (see "What surprised me" above) — the code path is
+  real and partially exercised live; a finished checkpoint was not produced in this session.
+- **The LoRA ablation row (Task 5.4d) run for real** — coded to skip with an explicit printed
+  reason in this environment rather than fake a result; genuinely running it needs real data and
+  meaningful GPU time neither of which existed here.
+- **Shadow mode accumulating real comparison data over live traffic** — the wiring is real and
+  unit-tested, but no real user traffic has flowed through `score_turn` with shadow mode enabled
+  yet in this environment (Phase 4's own recruited-session gap applies here too).
+- **CI** — no push/CI access in this environment, the same standing gap every previous phase has
+  recorded.

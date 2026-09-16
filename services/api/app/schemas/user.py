@@ -21,6 +21,9 @@ class UserOut(BaseModel):
     avatar_url: str | None
     created_at: datetime
     onboarded_at: datetime | None
+    # Task 5.3a: the frontend needs this to decide whether to show the /app/annotate nav item
+    # at all — the route itself is re-checked server-side by AdminUser regardless.
+    is_admin: bool
 
 
 class ProfileOut(BaseModel):

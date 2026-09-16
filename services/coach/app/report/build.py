@@ -23,6 +23,7 @@ from ..db.repository import (
     get_turn_scores_for_session,
     get_turns_for_session,
     insert_model_call,
+    insert_shadow_score,
     set_turns_scrubbed_text,
     upsert_report,
     upsert_session_score,
@@ -176,12 +177,65 @@ async def score_turn(ctx: dict[str, Any], *, session_id: str, turn_id: str) -> N
                 cached=stats.cached,
             )
 
+    await maybe_run_shadow_scoring(
+        sid, tid, question=question, answer=answer, criteria=criteria
+    )
+
     logger.info(
         "score_turn_complete",
         session_id=session_id,
         turn_id=turn_id,
         criteria_scored=len(criteria),
     )
+
+
+async def maybe_run_shadow_scoring(
+    session_id: std_uuid.UUID,
+    turn_id: std_uuid.UUID,
+    *,
+    question: str,
+    answer: str,
+    criteria: list[RubricCriterion],
+) -> None:
+    """docs/phase-5-BUILD.md TASK 5.5d / CS-12. Off the primary scoring path entirely — its own
+    scorer instance, its own writes, and any failure here is caught and logged, never allowed to
+    fail the turn's real score_turn job (this is a comparison measurement, not part of the
+    product). Written to `shadow_scores`, not `turn_scores` (docs/decisions/0021).
+    """
+    settings = get_settings()
+    if not should_run_shadow_scoring(settings.shadow_sample_rate):
+        return
+    try:
+        shadow_scorer = get_scorer(impl=settings.shadow_scorer_impl)
+        shadow_results = await shadow_scorer.score_batch(question, answer, criteria)
+        sessionmaker = get_sessionmaker()
+        async with sessionmaker() as db:
+            for criterion, result in zip(criteria, shadow_results, strict=True):
+                await insert_shadow_score(
+                    db,
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    criterion_key=criterion.key,
+                    score=round(result.score) if result.score is not None else None,
+                    confidence=result.confidence,
+                    model_version=shadow_scorer.version,
+                )
+    except Exception:  # noqa: BLE001 - a shadow-mode failure must never propagate
+        logger.warning("shadow_scoring_failed", session_id=str(session_id), turn_id=str(turn_id))
+
+
+def should_run_shadow_scoring(sample_rate: float) -> bool:
+    """Pure — the one line of actual "should this turn get shadow-scored" logic, kept separate
+    from the async DB/model-call plumbing above so it's directly unit-testable
+    (tests/unit/coach/test_shadow_mode.py) without mocking a scorer or a database.
+    """
+    import random
+
+    if sample_rate <= 0:
+        return False
+    if sample_rate >= 1:
+        return True
+    return random.random() < sample_rate  # noqa: S311 - sampling decision, not security-sensitive
 
 
 async def generate_report(ctx: dict[str, Any], *, session_id: str, wait_attempt: int = 0) -> None:

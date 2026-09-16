@@ -17,7 +17,7 @@ from .core.exceptions import AppError
 from .core.logging import configure_logging, get_logger
 from .core.middleware import trace_id_middleware
 from .core.redis_client import get_redis_pool
-from .routers import auth, health, me, personas, rubrics, scenarios, sessions
+from .routers import annotate, auth, health, me, personas, registry, rubrics, scenarios, sessions
 from .schemas.common import ErrorBody, ErrorResponse
 
 logger = get_logger(__name__)
@@ -122,3 +122,5 @@ app.include_router(scenarios.router)
 app.include_router(personas.router)
 app.include_router(rubrics.router)
 app.include_router(sessions.router)
+app.include_router(annotate.router)
+app.include_router(registry.router)

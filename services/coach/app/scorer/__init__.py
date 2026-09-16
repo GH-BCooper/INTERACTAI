@@ -18,8 +18,12 @@ __all__ = [
 ]
 
 
-def get_scorer() -> Scorer:
-    impl = get_settings().scorer_impl
+def get_scorer(*, impl: str | None = None) -> Scorer:
+    """`impl` overrides the configured `scorer_impl` — used only by shadow mode
+    (docs/phase-5-BUILD.md TASK 5.5d), which deliberately instantiates a *different*
+    configuration from the primary scorer for live comparison. Every ordinary caller omits it
+    and gets the configured primary, exactly as before."""
+    impl = impl or get_settings().scorer_impl
     if impl == "finetuned":
         return FinetunedScorer()
     if impl == "prompted":

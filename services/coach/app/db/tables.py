@@ -169,6 +169,20 @@ model_calls = Table(
     Column("cached", Boolean, nullable=False),
 )
 
+shadow_scores = Table(
+    "shadow_scores",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("session_id", PGUUID(as_uuid=True), ForeignKey("sessions.id"), nullable=False),
+    Column("turn_id", PGUUID(as_uuid=True), nullable=False),
+    Column("criterion_key", Text, nullable=False),
+    Column("score", Integer),
+    Column("confidence", Float, nullable=False),
+    Column("model_version", Text, nullable=False),
+)
+
 failed_jobs = Table(
     "failed_jobs",
     metadata,
