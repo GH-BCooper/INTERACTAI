@@ -1349,7 +1349,8 @@ no agreement figure were invented (docs/decisions/0027).
 3. **`docker-compose.yml` pinned the network name**, so the self-host stack joined the dev stack's
    network and `postgres` resolved to both databases. The self-host API wrote one
    `local@selfhost.invalid` user into the dev DB, which was deleted. The network is now
-   project-scoped.
+   project-scoped. **Existing dev checkouts: run `docker compose up -d --force-recreate` once**
+   (containers created before this change still reference the old network name; volumes are kept).
 4. **The standalone Next build fails on Windows** (symlink permission); it is now opt-in and used
    only in the Dockerfile. pnpm 11 needs Node ≥ 22 (web image moved to `node:22`).
 5. **The post-generation check does not catch praise** (found by Level 2, not fixed; see results).
