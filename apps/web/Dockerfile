@@ -1,6 +1,6 @@
 # Phase 6 TASK 6.4a — web, for the self-host path (the hosted instance runs on Vercel).
 # Build from the repo root: docker build -f apps/web/Dockerfile .
-FROM node:20-bookworm-slim AS builder
+FROM node:22-bookworm-slim AS builder
 RUN corepack enable
 WORKDIR /repo
 # Dependency manifests first, source last — a code change does not re-install node_modules.
@@ -20,7 +20,7 @@ ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
     NEXT_TELEMETRY_DISABLED=1
 RUN pnpm --filter @interactai/web run build
 
-FROM node:20-bookworm-slim AS runtime
+FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 NEXT_TELEMETRY_DISABLED=1
 COPY --from=builder --chown=node:node /repo/apps/web/.next/standalone ./

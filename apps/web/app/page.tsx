@@ -4,8 +4,9 @@ import Link from "next/link";
 
 import { AudioProofStrip, type ProofTurn } from "@/components/landing/audio-proof-strip";
 import { CopyCommand } from "@/components/landing/copy-command";
-import { GitHubStars, REPO } from "@/components/landing/github-stars";
+import { GitHubStars } from "@/components/landing/github-stars";
 import { TwoAgentDiagram } from "@/components/landing/two-agent-diagram";
+import { REPO } from "@/lib/repo";
 
 import demo from "../public/demo/sample-session.json";
 import published from "../public/published-metrics.json";

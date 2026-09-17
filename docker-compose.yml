@@ -77,8 +77,10 @@ services:
     networks: [interactai]
 
 networks:
+  # Project-scoped, not a fixed global name: compose.selfhost.yml includes this file, and a fixed
+  # name made a second stack on the same machine join the first one's network, where the
+  # hostname `postgres` resolved to either database (found verifying self-host, Phase 6).
   interactai:
-    name: interactai
 
 # Named volumes, not bind mounts, for data. `make clean` removes them; nothing else does.
 volumes:

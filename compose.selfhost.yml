@@ -63,12 +63,26 @@ services:
     entrypoint: ["ollama", "pull", "qwen2.5:3b-instruct"]
     networks: [interactai]
 
+  # One-shot: Silero VAD + Piper voices into the models volume (weights never live in an image).
+  models-fetch:
+    build: { context: ., dockerfile: services/realtime/Dockerfile }
+    volumes:
+      - models:/models
+    command: ["python", "deploy/fetch_models.py"]
+    networks: [interactai]
+
   migrate:
     build: { context: ., dockerfile: services/api/Dockerfile }
-    environment: *app-env
+    environment:
+      <<: *app-env
+      PIPER_VOICE_DIR: /models/piper  # seed validation checks every persona voice exists
+    volumes:
+      - models:/models:ro
     depends_on:
       postgres:
         condition: service_healthy
+      models-fetch:
+        condition: service_completed_successfully
     command: ["sh", "-c", "cd services/api && alembic upgrade head && cd /srv && python scripts/seed.py"]
     networks: [interactai]
 

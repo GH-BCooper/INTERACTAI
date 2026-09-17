@@ -97,8 +97,9 @@ The orchestrator's kill grace period must exceed 10 s + `SHUTDOWN_DRAIN_TIMEOUT_
 | Silero VAD | ~5 MB |
 | Per session: ring buffers, WAV writer, persona history | ~10–20 MB |
 
-Rule of thumb: **~550 MB + 20 MB × MAX_CONCURRENT_SESSIONS**. These are sizing estimates for
-planning; they are not benchmark results.
+Rule of thumb: **~550 MB + 20 MB × MAX_CONCURRENT_SESSIONS**. The per-component rows are planning
+estimates. One measured point: the self-host `realtime` container sat at **675 MiB resident**
+(`docker stats`, 2026-09-17) with VAD, `base.en` and both voices loaded and no live session.
 
 ## Self-host (AS-12)
 
@@ -107,6 +108,20 @@ git clone https://github.com/GH-BCooper/INTERACTAI.git && cd INTERACTAI
 docker compose -f compose.selfhost.yml up --build
 # open http://localhost:3000 → Sign in → "Continue locally"
 ```
+
+Verified 2026-09-17 from a fresh `git clone` into an empty directory with volumes removed first:
+every service healthy, migrations and seed applied, "Continue locally" signed in, `/health`
+answered 200 while `/health/ready` was still 503 during model load. A real replayed voice session
+then ran end to end: opening line from the local model, VAD/endpointing, ASR, turn persisted,
+recording uploaded to MinIO, `score_turn` and `generate_report` consumed by the coach, session
+closed cleanly. **What did not work on that machine** (a CPU-only laptop, Docker Desktop):
+`qwen2.5:3b-instruct` on CPU could not answer a turn inside the 12 s `thinking` watchdog, so the
+persona's reply degraded to the holding line. Self-host needs either a GPU for Ollama or a smaller
+persona model (set `MODEL_PERSONA` in `compose.selfhost.yml`).
+
+Do not run the self-host stack and the dev infrastructure (`make up`) on the same host ports; set
+`POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`, `MINIO_API_HOST_PORT` and `MINIO_CONSOLE_HOST_PORT` if
+both must run.
 
 No API keys. Ollama (`qwen2.5:3b-instruct`) serves persona, planner, scorer and narrator;
 faster-whisper and Piper run inside `realtime`; Postgres, Redis and MinIO come from

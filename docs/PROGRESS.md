@@ -1290,3 +1290,107 @@ alongside.
   yet in this environment (Phase 4's own recruited-session gap applies here too).
 - **CI** — no push/CI access in this environment, the same standing gap every previous phase has
   recorded.
+
+## 2026-09-17 — Phase 6: proof and polish
+
+Every task in `docs/phase-6-BUILD (1).md` has code. Several acceptance criteria are honestly not
+met, and each is listed below with the measured reason. The owner permitted invented data and
+autonomous fine-tuning for this phase. Synthetic data was used only where it is labelled and makes
+no claim about humans (the load test, fixtures, the demo's scripted answers). No human labels and
+no agreement figure were invented (docs/decisions/0027).
+
+### What exists now
+
+- **6.1 Observability** (`/app/observability`, admin): e2e percentile header queried directly from
+  `latency_events WHERE stage='e2e'`, with the 1400 ms target line drawn and filters for window,
+  scenario family and host class (`latency_events.host_class`, new); a stage breakdown stacked in
+  pipeline order; a turn waterfall (bars, ms labels, click a stage for its `model_calls` row, user
+  audio cut from the recording, persona audio regenerated via an admin replay token); a sortable,
+  filterable model-call table with cache hit rate; a cost panel (actual, frontier counterfactual
+  priced from `content/pricing/frontier.yaml` using measured judge token means, and the ratio).
+  Covering index `ix_latency_events_stage_created_at_cover`. Migration `b8c9d0e1f2a3`.
+- **6.2 Evaluations** (`/app/evals`, admin): model registry with confirm-then-promote/rollback
+  (status changes through the Phase 5 registry service, which now writes `deployment_events`);
+  suite results; a per-case grid (human labels vs model score, linking to the report, sorted by
+  disagreement descending); a regression chart with deployment markers; a two-version comparison
+  over identical cases (`turn_scores` ∪ `shadow_scores`), disagreements first; a speech panel.
+- **6.3 Suites**: `make eval-speech` (`scripts/eval_speech.py`), `make eval-persona`
+  (`scripts/eval_persona.py`, judge prompt `content/prompts/eval/persona-judge.v1.md`),
+  `.github/workflows/nightly-eval.yml` (all three levels, job summary via
+  `scripts/publish_metrics.py`, opens or updates a `nightly-eval` issue on failure). New fixtures:
+  technical-vocabulary and accented clips plus `tests/fixtures/audio/manifest.json`, and
+  `tests/fixtures/persona/candidate_scripts.json`.
+- **6.4 Deployment**: Dockerfiles for api, coach, realtime and web; `deploy/fetch_models.py` (weights
+  downloaded on first boot into a volume); `compose.selfhost.yml` (Ollama, local login, one-shot
+  model fetch and migrate/seed); realtime loads models in a background task (liveness up
+  immediately, readiness 503 until loaded, sockets refused with 1013 meanwhile), drains on SIGTERM
+  (`drain_sessions`, `SHUTDOWN_DRAIN_TIMEOUT_S`), and the client shows "At capacity, try again
+  shortly" on close 4429. `docs/18-deployment.md` covers topology, affinity, memory sizing and the
+  production env checklist, including second OAuth apps.
+- **6.5 `/demo`**: a static bundle (`apps/web/public/demo/`) exported through the API's own
+  serializers from a session recorded through the live pipeline (`scripts/record_demo.py`,
+  `scripts/export_demo.py`) and rendered by the real report components (`ReportHeader`,
+  `Waveform`, `VerdictBlock`, `ScorePanel`, `DeliveryPanel`, `Transcript`, each with a `readOnly`
+  mode), with a guided 60-second tour that seeks to a verified evidence span.
+- **6.6 Landing** at `/` (sign-in moved to `/signin`): hero, a playable audio proof strip with
+  measured per-turn latency, three screenshot panels, an SVG two-agent diagram, an evaluation
+  callout with provenance on every figure, a one-click self-host command, and a footer that says it
+  does not predict hiring outcomes.
+- **6.7 Docs**: README rewritten to the required structure; decisions 0022–0027;
+  `docs/DEMO-VIDEO-SCRIPT.md`.
+
+### Real bugs found by running things live
+
+1. **Every live user turn failed to persist** (`turns.training_excluded` NOT NULL with no default
+   since Phase 4; realtime never set it), so the persona never replied. Fixed, with a regression test
+   confirmed red first (decision 0023).
+2. **The coach never scored live turns**: `enqueue_score_turn` was never called on the turn path.
+   Fixed; verified by a live session producing 32 `turn_scores` rows and a ready report.
+3. **`docker-compose.yml` pinned the network name**, so the self-host stack joined the dev stack's
+   network and `postgres` resolved to both databases. The self-host API wrote one
+   `local@selfhost.invalid` user into the dev DB, which was deleted. The network is now
+   project-scoped.
+4. **The standalone Next build fails on Windows** (symlink permission); it is now opt-in and used
+   only in the Dockerfile. pnpm 11 needs Node ≥ 22 (web image moved to `node:22`).
+5. **The post-generation check does not catch praise** (found by Level 2, not fixed; see results).
+
+### Measured results
+
+- Speech (eval_runs `01a0ac1e`): WER 0.052 overall (clean 0, accented 0, technical 0.156), ASR RTF
+  0.13, TTS RTF 0.11, endpoint precision 0.573 / recall 1.0 over 220 boundaries, **passed**.
+- Latency on `dev-laptop-cpu`, n = 8: p50 3,576 / p90 4,774 / p95 5,936 ms. **Budget not met.**
+- Persona, local `qwen2.5:3b` (eval_runs `01a0aca9`): break rate 0.05 (3/60, all praise); tiers
+  separated on follow-up rate only (p = 0.042; ack p = 0.30, interruptions p = 0.88). **Failed,
+  correctly.** Broken-prompt check (eval_runs `01a0acaf`): 0.75.
+- Persona on hosted `gpt-oss-20b` (eval_runs `01a0ac90`): **invalid**. Groq's free-tier daily token
+  quota ran out mid-run, so 55/60 replies were canned deflections. Not published.
+- Live safety suite: 33/36. The 3 failures are the hosted-model distress exits, run while that
+  quota was exhausted; all 18 local-model cases passed. Re-run when the quota resets.
+- Images (`docker images`): api 351 MB (met), coach 776 MB (target 400, missed), realtime 1.08 GB
+  (target 800, missed); no weights in any layer (decision 0026).
+- Lighthouse performance (mobile, throttled, 3 runs): `/` 0.99 / 0.98 / 0.89; `/demo`
+  0.85 / 0.87 / 0.90.
+
+### Verified by running
+
+- 633 pytest (unit + integration, including 10,000-event observability load under 2 s and an
+  EXPLAIN check on the covering index, local login, drain, liveness/readiness), 92 vitest, ruff,
+  ruff format, mypy (strict on realtime), eslint, tsc, `next build`.
+- `/demo` and `/` served 200 from `next start` with api, realtime and coach stopped.
+- Self-host from a fresh clone with volumes removed: all services healthy, migrate and seed applied,
+  local sign-in issued a token, and a replayed voice session ran through VAD, ASR, persistence,
+  MinIO upload, coach jobs and a clean close.
+
+### Not done / not verified
+
+- **Deployed instance**: not deployed (needs Vercel/Neon/Upstash/R2/HF credentials outside this repo).
+- **Recorded 3-minute video**: not recorded; needs a human voice (script written).
+- **Resume and skills section**: outside this repository; not touched.
+- **Scorer agreement vs the human ceiling**: no human-labelled split exists (decision 0027).
+- **Self-host persona replies**: on this CPU-only laptop, `qwen2.5:3b` in Docker exceeds the 12 s
+  thinking watchdog, so replies degraded to the holding line.
+- **SIGTERM drain against a live socket in a container**: covered by unit tests only.
+- **At-capacity close against a live server**: covered by handshake and client unit tests only.
+- **Nightly workflow**: written, not yet run on GitHub (needs the `GROQ_API_KEY` secret).
+- **Observability and evaluations pages in a browser with real admin data**: API integration-tested
+  and type-checked; not visually checked while signed in.

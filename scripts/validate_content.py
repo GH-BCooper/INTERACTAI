@@ -14,6 +14,7 @@ Also imported by scripts/seed.py, which refuses to write anything if this fails.
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -22,7 +23,9 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONTENT_DIR = REPO_ROOT / "content"
-PIPER_DIR = REPO_ROOT / "models" / "piper"
+# PIPER_VOICE_DIR is the same variable realtime reads: in containers the voices live on the
+# models volume, not under the repo (compose.selfhost.yml).
+PIPER_DIR = Path(os.environ.get("PIPER_VOICE_DIR") or REPO_ROOT / "models" / "piper")
 
 SCALE_POINTS = {"1", "2", "3", "4", "5"}
 MIN_DESCRIPTOR_LENGTH = 40

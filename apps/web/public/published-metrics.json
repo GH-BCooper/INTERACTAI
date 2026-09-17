@@ -1,1 +1,243 @@
-{"generated_at": null, "latency": null, "speech": null, "persona": null, "scorer": null, "human_ceiling": null}
+{
+ "generated_at": "2026-09-17T00:06:17.107266+00:00",
+ "latency": {
+  "eval_run_id": "01a0ac1e-6f63-7470-ad43-69d4da02d4d9",
+  "configuration": "asr=base.en;tts=en_US-lessac-medium",
+  "dataset_revision": "66429d7de3c0c72954c7fd3cefef2c22134e3ae6",
+  "prompt_version": null,
+  "host_class": "dev-laptop-cpu",
+  "date": "2026-09-16",
+  "metrics": {
+   "passed": true,
+   "ttfa_n": 8,
+   "asr_rtf": 0.1262,
+   "tts_rtf": 0.1025,
+   "per_item": [
+    {
+     "rtf": 0.1776,
+     "wer": 0.0,
+     "file": "clean_utterance_3s.wav",
+     "group": "clean",
+     "hypothesis": "The deployment finished about 10 minutes ago, and it looks good."
+    },
+    {
+     "rtf": 0.1952,
+     "wer": 0.0,
+     "file": "mid_sentence_pause_700ms.wav",
+     "group": "clean",
+     "hypothesis": "I checked the logs first and found the issue quickly."
+    },
+    {
+     "rtf": 0.138,
+     "wer": 0.0,
+     "file": "accented_utterance.wav",
+     "group": "accented",
+     "hypothesis": "I'd say the whole process took roughly 3 weeks, give or take a few days."
+    },
+    {
+     "rtf": 0.1015,
+     "wer": 0.0,
+     "file": "accented_behavioural.wav",
+     "group": "accented",
+     "hypothesis": "I disagreed with my manager about the deadline, so I brought data to the meeting and we agreed on a smaller scope."
+    },
+    {
+     "rtf": 0.1424,
+     "wer": 0.2,
+     "file": "technical_vocab_us.wav",
+     "group": "technical",
+     "hypothesis": "We sharded the poster's cluster, puttritis in front of it, and moved the Kubernetes ingress behind a low balancer."
+    },
+    {
+     "rtf": 0.0798,
+     "wer": 0.1111,
+     "file": "technical_vocab_accented.wav",
+     "group": "technical",
+     "hypothesis": "The P95 latency regressed after the G-RPC migration, so we rolled back the Canary and added an Index."
+    }
+   ],
+   "asr_model": "base.en",
+   "tts_voice": "en_US-lessac-medium",
+   "wer_clean": 0.0,
+   "host_class": "dev-laptop-cpu",
+   "ttfa_p50_ms": 3576,
+   "ttfa_p90_ms": 4774,
+   "ttfa_p95_ms": 5936,
+   "wer_overall": 0.0519,
+   "wer_accented": 0.0,
+   "wer_technical": 0.1556,
+   "endpoint_items": 220,
+   "endpoint_labels": "data/boundaries/labels.jsonl (synthetic Piper speech, hand-marked true ends)",
+   "endpoint_recall": 1.0,
+   "endpoint_precision": 0.5727,
+   "endpoint_latency_p50_ms": 506.80000000000007,
+   "endpoint_latency_p95_ms": 596.2750000000001
+  },
+  "qwk": null,
+  "split": "validation",
+  "published": false,
+  "p50_ms": 3576,
+  "p90_ms": 4774,
+  "p95_ms": 5936,
+  "n": 8,
+  "target_p95_ms": 1400
+ },
+ "speech": {
+  "eval_run_id": "01a0ac1e-6f63-7470-ad43-69d4da02d4d9",
+  "configuration": "asr=base.en;tts=en_US-lessac-medium",
+  "dataset_revision": "66429d7de3c0c72954c7fd3cefef2c22134e3ae6",
+  "prompt_version": null,
+  "host_class": "dev-laptop-cpu",
+  "date": "2026-09-16",
+  "metrics": {
+   "passed": true,
+   "ttfa_n": 8,
+   "asr_rtf": 0.1262,
+   "tts_rtf": 0.1025,
+   "per_item": [
+    {
+     "rtf": 0.1776,
+     "wer": 0.0,
+     "file": "clean_utterance_3s.wav",
+     "group": "clean",
+     "hypothesis": "The deployment finished about 10 minutes ago, and it looks good."
+    },
+    {
+     "rtf": 0.1952,
+     "wer": 0.0,
+     "file": "mid_sentence_pause_700ms.wav",
+     "group": "clean",
+     "hypothesis": "I checked the logs first and found the issue quickly."
+    },
+    {
+     "rtf": 0.138,
+     "wer": 0.0,
+     "file": "accented_utterance.wav",
+     "group": "accented",
+     "hypothesis": "I'd say the whole process took roughly 3 weeks, give or take a few days."
+    },
+    {
+     "rtf": 0.1015,
+     "wer": 0.0,
+     "file": "accented_behavioural.wav",
+     "group": "accented",
+     "hypothesis": "I disagreed with my manager about the deadline, so I brought data to the meeting and we agreed on a smaller scope."
+    },
+    {
+     "rtf": 0.1424,
+     "wer": 0.2,
+     "file": "technical_vocab_us.wav",
+     "group": "technical",
+     "hypothesis": "We sharded the poster's cluster, puttritis in front of it, and moved the Kubernetes ingress behind a low balancer."
+    },
+    {
+     "rtf": 0.0798,
+     "wer": 0.1111,
+     "file": "technical_vocab_accented.wav",
+     "group": "technical",
+     "hypothesis": "The P95 latency regressed after the G-RPC migration, so we rolled back the Canary and added an Index."
+    }
+   ],
+   "asr_model": "base.en",
+   "tts_voice": "en_US-lessac-medium",
+   "wer_clean": 0.0,
+   "host_class": "dev-laptop-cpu",
+   "ttfa_p50_ms": 3576,
+   "ttfa_p90_ms": 4774,
+   "ttfa_p95_ms": 5936,
+   "wer_overall": 0.0519,
+   "wer_accented": 0.0,
+   "wer_technical": 0.1556,
+   "endpoint_items": 220,
+   "endpoint_labels": "data/boundaries/labels.jsonl (synthetic Piper speech, hand-marked true ends)",
+   "endpoint_recall": 1.0,
+   "endpoint_precision": 0.5727,
+   "endpoint_latency_p50_ms": 506.80000000000007,
+   "endpoint_latency_p95_ms": 596.2750000000001
+  },
+  "qwk": null,
+  "split": "validation",
+  "published": false
+ },
+ "persona": {
+  "eval_run_id": "01a0aca9-ac05-70c0-8c6d-df04583b22d9",
+  "configuration": "persona=ollama/qwen2.5:3b-instruct",
+  "dataset_revision": "d29a7849f052b7636e71058d699d098b3f71c02e",
+  "prompt_version": "static:1.1.0+brief:1.0.0+dynamic:1.0.0",
+  "host_class": "dev-laptop-cpu",
+  "date": "2026-09-16",
+  "metrics": {
+   "passed": false,
+   "judge_model": "groq/openai/gpt-oss-120b",
+   "safety_suite": "skipped (--skip-safety)",
+   "broken_prompt": false,
+   "persona_model": "ollama/qwen2.5:3b-instruct",
+   "break_examples": [
+    {
+     "tier": "gentle",
+     "quote": "good example",
+     "reply": "Sure thing. That's a good example of a technical decision you made. Can you tell me more about the decision-making process for choosing SQS over Kafka?",
+     "category": "praise"
+    },
+    {
+     "tier": "gentle",
+     "quote": "Great, that\u2019s a start.",
+     "reply": "Great, that\u2019s a start. What did you actually build this year that you consider the hardest?",
+     "category": "praise"
+    },
+    {
+     "tier": "standard",
+     "quote": "that's impressive",
+     "reply": "Sure, that's impressive. Can you tell me more about the specific actions you took in profiling the checkout service and how the issue was resolved?",
+     "category": "praise"
+    }
+   ],
+   "plan_adherence": 1.0,
+   "persona_replies": 60,
+   "character_breaks": 3,
+   "difficulty_means": {
+    "hard": {
+     "ack_words": 7.25,
+     "followup_rate": 0.9,
+     "interruptions": 0.0
+    },
+    "gentle": {
+     "ack_words": 13.0,
+     "followup_rate": 0.5,
+     "interruptions": 0.2
+    },
+    "standard": {
+     "ack_words": 10.35,
+     "followup_rate": 0.8,
+     "interruptions": 0.0
+    }
+   },
+   "sessions_per_tier": 5,
+   "canned_deflections": 4,
+   "character_break_rate": 0.05,
+   "judge_prompt_version": "1.0.0",
+   "question_repetitions": 9,
+   "difficulty_separation": {
+    "passed": false,
+    "p_values": {
+     "ack_words": 0.29794,
+     "followup_rate": 0.04163,
+     "interruptions": 0.88493
+    },
+    "separated": {
+     "ack_words": false,
+     "followup_rate": true,
+     "interruptions": false
+    }
+   },
+   "turn_length_p50_words": 20.0,
+   "turn_length_p95_words": 63.099999999999994,
+   "turn_length_mean_words": 24.63
+  },
+  "qwk": null,
+  "split": "validation",
+  "published": false
+ },
+ "scorer": null,
+ "human_ceiling": null
+}

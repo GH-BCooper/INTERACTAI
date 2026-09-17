@@ -3,7 +3,8 @@
 import { Star } from "lucide-react";
 import { useEffect, useState } from "react";
 
-export const REPO = "GH-BCooper/INTERACTAI";
+import { REPO } from "@/lib/repo";
+
 
 /** Live star count, fetched client-side after paint so it never blocks the hero. Shows nothing
  * rather than a guessed number if the GitHub API is unreachable or rate-limited. */

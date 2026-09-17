@@ -108,7 +108,7 @@ class Timeline:
 
 
 async def run(args: argparse.Namespace) -> int:
-    answers = sorted(RAW_DIR.glob("answer_*.wav"))
+    answers = sorted(RAW_DIR.glob("answer_*.wav"))[: args.answers]
     if not answers:
         print("no data/demo_raw/answer_*.wav — generate them first", file=sys.stderr)
         return 1
@@ -178,7 +178,7 @@ async def run(args: argparse.Namespace) -> int:
                 await asyncio.sleep(0.02)
 
         for path in answers:
-            await asyncio.wait_for(persona_idle.wait(), timeout=60)
+            await asyncio.wait_for(persona_idle.wait(), timeout=args.turn_timeout_s)
             # Wait until the scheduled persona audio has actually finished "playing".
             while timeline.now_s() < timeline.persona_cursor_s:
                 await send_silence(0.1)
@@ -195,7 +195,7 @@ async def run(args: argparse.Namespace) -> int:
                 await asyncio.sleep(0.02)
             await send_silence(1.5)
 
-        await asyncio.wait_for(persona_idle.wait(), timeout=60)
+        await asyncio.wait_for(persona_idle.wait(), timeout=args.turn_timeout_s)
         while timeline.now_s() < timeline.persona_cursor_s + 0.3:
             await send_silence(0.1)
         await ws.send(json.dumps({"type": "end_session", "seq": seq, "reason": "user_hangup"}))
@@ -227,6 +227,8 @@ def main() -> int:
     parser.add_argument("--difficulty", default="standard")
     parser.add_argument("--target-minutes", type=int, default=5)
     parser.add_argument("--realtime-url", default="ws://localhost:8080/ws")
+    parser.add_argument("--turn-timeout-s", type=float, default=60.0)
+    parser.add_argument("--answers", type=int, default=None, help="use only the first N answers")
     return asyncio.run(run(parser.parse_args()))
 
 
