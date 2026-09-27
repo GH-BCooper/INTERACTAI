@@ -149,6 +149,11 @@ Set on every service unless noted. Secrets never go in the repo.
 
 ## Deployed instance
 
-Not deployed from this environment: provisioning Vercel, Neon, Upstash, R2 and a Hugging Face
-Space needs account credentials that live outside this repository. The images, compose file and
-this checklist are the complete path; see PROGRESS.md Phase 6 for status.
+**Postgres is live on Neon** (project `interactai`, region `ap-southeast-1`, branch
+`production`), migrated to head and seeded. Run `make migrate` / `make seed` against it by
+exporting `DATABASE_URL` as the Neon URL (asyncpg form, `?ssl=require`) — the app reads only
+`DATABASE_URL`; `DATABASE_URL_PROD` in `.env` is where the value is kept.
+
+Not yet provisioned from this environment: Vercel, Upstash, R2 and a Hugging Face Space need
+account credentials that live outside this repository. The images, compose file and this
+checklist are the complete path; see PROGRESS.md Phase 6 for status.
