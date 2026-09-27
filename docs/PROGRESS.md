@@ -1395,3 +1395,72 @@ no agreement figure were invented (docs/decisions/0027).
 - **Nightly workflow**: written, not yet run on GitHub (needs the `GROQ_API_KEY` secret).
 - **Observability and evaluations pages in a browser with real admin data**: API integration-tested
   and type-checked; not visually checked while signed in.
+
+## 2026-09-27 — Phase 6 re-verification (no new code)
+
+Re-ran the Phase 6 build specification against the committed tree. **No code was written this
+session**: every task in `docs/phase-6-BUILD (1).md` was already implemented and committed, so this
+entry records only what was re-run and what the current machine state does to it.
+
+### Re-run green
+
+- `ruff check .` — clean; `mypy --strict services/realtime/app` — 53 files, no issues;
+  `tsc --noEmit` (apps/web) — clean.
+- vitest: **92 passed**, 16 files.
+- pytest `tests/unit` + `tests/unit/realtime` in isolation: **370 passed, 8 skipped** for realtime;
+  555–557 passed across the non-integration suite.
+- pytest `tests/integration`: **67 passed, 1 skipped, 2 failed** (both failures are local `.env`
+  configuration, see below).
+- `tests/integration/test_phase6_observability.py` and `test_phase6_local_login.py`: **6 passed**,
+  including the assertion that all five observability endpoints answer in **< 2 s over 10,000
+  `latency_events` rows**, and the `EXPLAIN` check that the `stage = 'e2e'` percentile query uses
+  `ix_latency_events_stage_created_at_cover`.
+
+### Environment-caused failures — not code defects, all diagnosed to root cause
+
+1. **`TestDeleteMe` (2 integration tests) fail with `ClientError 410 Gone` on `ListObjectsV2`.**
+   `.env` points `S3_*` at the hosted Supabase Storage project `wauxowrpcbltdobxvfqk`, which
+   auto-paused (the `.env` comment already records this, dated 2026-09-17). Re-running the same two
+   tests with `S3_ENDPOINT=http://localhost:9000` against the compose MinIO: **2 passed in 8.8 s.**
+   Note that `docker compose` reads `.env`, so the local MinIO container takes its root credentials
+   from the Supabase `S3_ACCESS_KEY`/`S3_SECRET_KEY` values — overriding the keys as well as the
+   endpoint produces `InvalidAccessKeyId`. Override the endpoint only, or uncomment the MinIO
+   fallback block in `.env`.
+2. **66 integration errors on the first run**: Docker Desktop was not running. Started it; they
+   collect and pass.
+3. **`test_semantic_endpointer.py` — 2 failed, 1 passed.** Needs Ollama with
+   `qwen2.5:0.5b-instruct`; Ollama answers on `:11434` but the model is not pulled, so the calls
+   return `model not found`. These tests **skip** when Ollama is unreachable and **fail** when it is
+   reachable without the model, which is why the realtime suite reports 8 skipped on one run and 5
+   skipped + 2 failed on another. Fix: `ollama pull qwen2.5:0.5b-instruct`.
+
+### One genuine, pre-existing defect found (not fixed)
+
+**`tests/unit/realtime/test_whisper_asr.py::test_initial_prompt_biasing_recognizes_uncommon_term`
+is not deterministic under CPU load**, which violates CLAUDE.md §7 ("Audio fixtures … deterministic").
+It passes alone (6.5 s) and passes with the whole realtime module (370 passed), but failed twice in
+full-suite runs where other tests were competing for CPU:
+
+```
+assert "spotmies" in biased.text.lower()
+AssertionError: assert 'spotmies' in 'the project is called spotbies, and we deployed it last week.'
+```
+
+The failure is on the **positive** assertion — `base.en` with the vocabulary hint decoded `spotbies`
+— so the test is load-sensitive, not merely asserting a fragile negative. It is a Phase 1 test and
+was left alone rather than fixed inside a Phase 6 session; the fix is to pin `cpu_threads` for the
+fixture model or assert an edit-distance improvement over the unbiased decode instead of an exact
+substring. Not yet recorded in `docs/decisions/`.
+
+### Still not done (unchanged from 2026-09-17)
+
+Deployed instance, the recorded video, the resume rewrite, and scorer agreement against a human
+ceiling. The agreement row was **not** filled in this session: inventing human labels would make
+every published QWK a fabrication (CLAUDE.md §1.9, §1.10, decision 0027), so `README.md` and
+`docs/RESULTS.md` still say `not yet measured`.
+
+Also noted: `docs/` contains the phase BUILD/LEARN specs plus `03-realtime-protocol.md` and
+`18-deployment.md`, but not the other numbered spec files listed in CLAUDE.md §14
+(`00-overview.md`, `02-data-model.md`, `04`–`17`). The Phase 6 criterion "`docs/` complete" is
+therefore **not** met on a literal reading, and no attempt was made to back-fill 15 spec documents
+from the implementation.
