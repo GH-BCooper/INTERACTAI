@@ -110,3 +110,46 @@ run, because that is the last run that happened. Re-running Level 2 against a li
 what would show a break rate of zero and a separated interruption measure, and until it is run the
 published figures stay as they are. Writing the improved numbers before measuring them is exactly
 what CLAUDE.md §1.10 forbids.
+
+---
+
+## Addendum, same day: the verification run was invalid, and why that was hard to see
+
+The Level 2 run made to verify the two fixes above (eval_runs `01a0e409`, hosted
+`groq/openai/gpt-oss-20b`, 6 sessions per tier, 72 replies) **must not be published**. It reported
+a character break rate of 0.097 and 20 canned deflections, and 48 of its 72 replies recorded
+`empty_reply`. Those 48 were **Groq rate-limit errors**, not the model returning nothing: the
+account's daily quota was exhausted partway through, exactly as happened to the 2026-09-16 hosted
+run. The behavioural numbers are measurements of a quota.
+
+This was believed to be a token-budget problem for about twenty minutes, and the wrong fix was
+written and committed with a confident comment explaining it. The reason is a single line in
+`persona/engine.py`: an exception from the provider and a genuinely empty generation were both
+recorded as `empty_reply`. With that conflation, "the provider is down" and "the persona said
+nothing" are indistinguishable in the transcript, in the logs and in the eval output — and the
+second reading is the more interesting one, so it is the one you reach for.
+
+Three changes follow from it:
+
+1. **`generation_error:<ExceptionType>` is now a distinct violation reason** from `empty_reply`,
+   and the exception type is logged. Both are covered by tests that assert the other reason is
+   absent, because the whole value here is in the two not collapsing again.
+2. **`eval_persona` reports `provider_failures`** and, when any exist, emits `INVALID RUN` at the
+   *front* of the failure list. A provider failure invalidates the behavioural metrics rather than
+   joining them, so it has to read as a different kind of thing, not one more red line.
+3. **`reasoning_effort` was kept but its justification rewritten.** The measurement behind it is
+   real and was taken directly: against `groq/openai/gpt-oss-20b`, uncapped replies spent 51–91
+   reasoning tokens, `low` spent 8–11. Every one of those tokens is generated before the first word
+   the user can hear, on a path with a 1400 ms budget, so capping it is defensible on TTFT grounds
+   alone. What is **not** measured is any effect on empty replies, and no end-to-end TTFT
+   comparison has been run against the hosted model, because the quota is now exhausted. The code
+   comment says so.
+
+What this run does show, weakly and not as a published figure: interruptions are no longer
+uniformly zero (gentle 0.33, standard 0.67, hard 0.67 per session, against 0.0 on every tier
+before), so the enforcement does fire and the judge does label it. It is not separation — p = 0.155
+with six sessions a tier, and gentle should be zero by construction since gentle has no cap, so
+the gentle figure is the judge labelling model-volunteered redirects as interruptions. Two praise
+phrasings the blocklist misses also appeared: "That sounds like a significant improvement" and
+"That sounds reasonable". Both are real and both need a re-run on a working quota before any of it
+becomes a number in the README.

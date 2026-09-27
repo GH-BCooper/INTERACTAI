@@ -80,6 +80,29 @@ def _transcribe_chunk_sync(
         condition_on_previous_text=False,
         vad_filter=False,
         initial_prompt=initial_prompt,
+        # `temperature=0.0` pins the decode to beam search alone. faster-whisper's default is the
+        # fallback ladder [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]: when a decode misses
+        # `log_prob_threshold` (-1.0) or `compression_ratio_threshold` (2.4) it retries at a
+        # non-zero temperature, which *samples* rather than searching. Two things follow that this
+        # system cannot accept.
+        #
+        # Determinism: the same audio would not produce the same transcript twice. Evidence spans
+        # are verified by exact substring match against the turn transcript and a span that does
+        # not match verbatim is discarded (CLAUDE.md §1.5), so a transcript that changes between
+        # decodes can silently invalidate the evidence a score rests on.
+        #
+        # Latency: every rung of that ladder is an additional full decode pass of the same audio,
+        # on the turn path, inside a 1400 ms end-to-end budget — up to five extra passes, decided
+        # by the audio rather than by us. `asr_finalize` is already the largest stage in the
+        # measured breakdown.
+        #
+        # Found via a test that asserted a real decode and failed only under CPU load
+        # (`test_initial_prompt_biasing_recognizes_uncommon_term`, 2026-09-27): an uncommon proper
+        # noun sits close enough to `log_prob_threshold` that small numeric differences flip the
+        # check, and once the fallback engages the output is random. The repetition-loop failure
+        # mode the ladder exists to rescue is already handled here by
+        # `condition_on_previous_text=False`, which is asserted by its own test.
+        temperature=0.0,
     )
     segments = list(segments)
     elapsed_s = time.perf_counter() - t0

@@ -190,6 +190,34 @@ class TestGeneratePersonaReply:
             )
         assert result.used_canned_deflection is True
         assert result.text  # never empty, even on total failure
+        # A provider failure must NOT be reported as `empty_reply`. It was, until 2026-09-27, and
+        # that single conflation invalidated two hosted Level 2 runs: 48 of 72 replies in
+        # eval_runs 01a0e409 looked like a reasoning model starving itself of output tokens and
+        # were in fact Groq rate-limit errors. A run that cannot tell "the provider was down" from
+        # "the persona said nothing" publishes a number about the wrong thing.
+        assert result.violations == ["generation_error:ConnectionError"] * 2
+        assert "empty_reply" not in result.violations
+
+    @pytest.mark.asyncio
+    async def test_a_genuinely_empty_generation_is_still_reported_as_empty_reply(self) -> None:
+        """The other side of the distinction above: the provider answered fine, the model just
+        produced no content. Same user-visible outcome, completely different fix."""
+
+        async def fake_acompletion(**kwargs: Any) -> Any:
+            return _fake_stream([])
+
+        with patch("litellm.acompletion", side_effect=fake_acompletion):
+            result = await generate_persona_reply(
+                model="fake/model",
+                max_tokens=180,
+                persona_context=PERSONA_CTX,
+                dynamic_context=DYNAMIC_CTX,
+                static_prompt_text=STATIC_TEXT,
+                turn_index=1,
+            )
+        assert result.used_canned_deflection is True
+        assert result.violations == ["empty_reply", "empty_reply"]
+        assert not any(v.startswith("generation_error") for v in result.violations)
 
     @pytest.mark.asyncio
     async def test_word_cap_truncation_trimmed_to_last_clause(self) -> None:

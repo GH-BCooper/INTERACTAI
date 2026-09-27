@@ -1464,3 +1464,118 @@ Also noted: `docs/` contains the phase BUILD/LEARN specs plus `03-realtime-proto
 (`00-overview.md`, `02-data-model.md`, `04`–`17`). The Phase 6 criterion "`docs/` complete" is
 therefore **not** met on a literal reading, and no attempt was made to back-fill 15 spec documents
 from the implementation.
+
+## 2026-09-27 — Fixing the two defects Level 2 found (and one I introduced on the way)
+
+Phase 6 was already built; this session fixed the two defects its own Level 2 suite reported, both
+of which the spec calls failures rather than warnings. Decision
+[0028](decisions/0028-enforcing-the-difficulty-ladder-and-blocking-praise.md) has the reasoning.
+
+### The two defects
+
+1. **Character break rate was non-zero and every break was praise.** The post-generation check
+   matched rubric leaks, coaching and grading, and matched no praise at all. There is now a separate
+   `PRAISE_BLOCKLIST` reported under its own violation reason. Every entry is a whole phrase, never
+   a bare adjective: the persona legitimately says "impressive", "perfect" and "strong" inside
+   ordinary questions, and a false positive costs a regeneration on the latency path. The
+   false-positive tests earned their keep immediately — they rejected "strong candidate" from my own
+   first draft, because "what made it a strong candidate for caching?" is ordinary technical
+   English. Neutral acknowledgements still pass, which the difficulty ladder depends on.
+   `content/prompts/persona/static.v1.md` bumped to **v1.2.0** with an explicit no-praise rule.
+
+2. **The difficulty ladder's top rung was decorative.** `interrupt_over_words: 120` existed on every
+   hard tier, was rendered into the prompt, and was enforced nowhere — so the measured interruption
+   rate was 0.0 on every tier. It is now enforced in code like the other two hard-tier parameters
+   already were: `exceeds_ramble_word_cap` in the cascade, checked in `frame_pipeline`'s `listening`
+   branch against the running partial transcript, forcing the endpoint mid-utterance. It routes
+   through `endpointing` because `listening -> thinking` is not a legal transition; **the WebSocket
+   protocol and the state-machine table are both untouched**. It is not the full-duplex barge-in
+   CLAUDE.md §9 excludes — we stop listening, then speak, as on any endpoint; what changes is who
+   decided the turn was over. The persona is told it interrupted, or it answers a fragment as
+   though it were a finished answer.
+
+   **Found while wiring it:** stop-on-speech would have cancelled the interruption the instant it
+   started, because the candidate is mid-sentence by definition when cut off. Without
+   `ramble_interrupt_active` the feature would have been enforced, measurable as enforced, and
+   never once audible.
+
+`scripts/eval_persona.py` now applies the same cap, because an eval that feeds the whole ramble in
+and waits for the model to volunteer an interruption measures behaviour no user can experience.
+
+### The wrong turn, kept on the record
+
+The verification run (eval_runs `01a0e409`, hosted `gpt-oss-20b`, 72 replies) reported 48
+`empty_reply`s. I read that as a reasoning model spending its `max_tokens` budget on reasoning
+before emitting content, and committed a `reasoning_effort` fix with a confident comment saying so.
+**It was Groq rate-limit errors** — the same quota exhaustion that invalidated the 2026-09-16 hosted
+run. `persona/engine.py` recorded a provider exception and a genuinely empty generation under the
+same reason, so the two were indistinguishable in the transcript, the logs and the eval output.
+
+- `generation_error:<ExceptionType>` is now a **distinct** violation reason from `empty_reply`, with
+  the exception type logged, and tests assert each excludes the other.
+- `eval_persona` reports `provider_failures` and emits `INVALID RUN` at the front of the failure
+  list when any exist — a provider failure invalidates the behavioural metrics rather than joining
+  them.
+- `reasoning_effort="low"` was **kept**, with its justification rewritten to what was actually
+  measured: 51–91 reasoning tokens uncapped vs 8–11 capped, on `gpt-oss-20b`, 6 calls each. Those
+  tokens all precede the first audible word on a path with a 1400 ms budget, so it stands on TTFT
+  grounds. Its effect on empty replies is **not** measured and the comment says so.
+
+### Verified by running
+
+- **574 unit tests pass, 5 skipped, 0 failed**, including the two new suites
+  (`test_ramble_interrupt.py`, `TestPraiseDetection`) and the previously flaky Whisper test.
+- **69 integration tests pass, 1 skipped**, now **hermetic**: integration gets a real MinIO
+  testcontainer, as CLAUDE.md §7 always specified. Before this, object-storage tests signed against
+  whatever `S3_*` in the developer's `.env` pointed at — a paused Supabase project made
+  `TestDeleteMe` fail with `410 Gone`, so a green suite depended on an external service being awake.
+- `ruff check`, `ruff format --check`, `mypy --strict services/realtime`, `mypy services/api`, all
+  clean.
+- **The Whisper flake is fixed at the cause, which turned out to be production code.** Pinning the
+  test model to `cpu_threads=1` was not enough — it failed again under full-suite load. The actual
+  cause: faster-whisper's default `temperature` is the fallback ladder
+  `[0.0, 0.2, 0.4, 0.6, 0.8, 1.0]`, and a decode that misses `log_prob_threshold` (-1.0) retries at
+  a non-zero temperature, which **samples instead of searching**. An uncommon proper noun sits close
+  enough to that threshold that small numeric differences flip it, and once the fallback engages the
+  transcript is random. `asr/whisper.py` now passes `temperature=0.0`.
+
+  This was a real defect, not a test annoyance. Evidence spans are verified by exact substring match
+  against the turn transcript and a non-matching span is discarded (CLAUDE.md §1.5), so a transcript
+  that changes between decodes can silently invalidate the evidence a score rests on. And every rung
+  of that ladder is an **additional full decode pass of the same audio on the turn path**, up to
+  five, inside a 1400 ms budget — while `asr_finalize` is already the largest measured stage. The
+  repetition-loop failure the ladder exists to rescue is already handled by
+  `condition_on_previous_text=False`, which has its own test.
+
+  Verified: four concurrent decodes of the fixture under full CPU load returned byte-identical text
+  (`Sputbys` unbiased, `Spotmies` biased) on every run.
+
+  **It still was not enough on its own**, and the test said so: with `temperature=0.0` in place it
+  passed the unit suite alone but failed once more when the unit and integration suites were run
+  *simultaneously*. So the test itself was also wrong. Task 1.4's criterion is that biasing
+  "**measurably improves** recognition of a technical-term fixture", and the test had encoded that as
+  `"spotmies" in biased and "spotmies" not in unbiased` — the claim sharpened to a knife edge on a
+  word that sits at the decision threshold. It now asserts the improvement it is named after: best
+  per-word similarity to `spotmies` must be strictly higher with the hint than without, and above
+  0.85 with it. That keeps the teeth (if biasing stops helping, it fails) and drops the coin flip.
+
+  Final check: unit and integration suites run **concurrently** — the condition that produced every
+  failure — **575 passed / 69 passed, zero failures.**
+- `ollama pull qwen2.5:0.5b-instruct` fixed the 2 semantic-endpointer failures (they *skip* when
+  Ollama is unreachable and *fail* when it is reachable without the model).
+
+### Not verified — and not written down as if it were
+
+- **No published Level 2 numbers changed.** The only run made this session is invalid for provider
+  reasons, and re-running needs the Groq daily quota to reset. The README still carries the
+  2026-09-16 figures. Weak, unpublished signal from the invalid run: interruptions were no longer
+  uniformly zero (0.33 / 0.67 / 0.67 per session vs 0.0 / 0.0 / 0.0 before), so the enforcement does
+  fire, but p = 0.155 over six sessions a tier is not separation.
+- **Two praise phrasings the first list missed** ("That sounds like a significant improvement",
+  "That sounds reasonable") were observed in that run and have been added, with neutral
+  "that sounds like a lot of work" style replies asserted to keep passing. Also unverified against a
+  live model for the same quota reason.
+- **The ramble interrupt has not been exercised against a live audio session** — unit tests cover
+  the cap, the tier wiring and the barge-in suppression; nothing has yet spoken over a real
+  microphone at hard difficulty.
+- `reasoning_effort`'s end-to-end TTFT effect: not measured.

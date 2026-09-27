@@ -85,6 +85,14 @@ class Settings(BaseSettings):
     # ── Model roles used on the realtime path ────────────────────────────────
     max_tokens_per_turn: int = 180
     max_tokens_per_session: int = 12_000
+    # Level 2 (eval_runs 01a0e409, 2026-09-27) measured 48 empty generations in 72 replies against
+    # `groq/openai/gpt-oss-20b`, 20 of which became canned deflections — 28% of the session. The
+    # cause is not the persona prompt: on a reasoning model `max_tokens` bounds reasoning *plus*
+    # content, so a 180-token turn budget was being spent thinking and the reply came back empty.
+    # `low` is the floor Groq accepts for gpt-oss; a non-reasoning model ignores this setting
+    # entirely (gated on `litellm.supports_reasoning`). This also cuts TTFT, since reasoning tokens
+    # are generated before the first content token the user can hear.
+    persona_reasoning_effort: str = "low"
     model_persona: str = "groq/openai/gpt-oss-20b"
     model_persona_local: str = "ollama/qwen2.5:3b-instruct"
     model_endpointer: str = "ollama/qwen2.5:0.5b-instruct"

@@ -22,6 +22,7 @@ from typing import Any
 
 import litellm
 
+from ..core.config import get_settings
 from ..core.logging import get_logger
 from .prompt import DynamicContext, PersonaContext, assemble_messages
 from .safety import check_reply, pick_canned_deflection
@@ -84,12 +85,30 @@ async def _stream_full_reply(
     ttft_ms: float | None = None
     parts: list[str] = []
     usage: dict[str, Any] = {"tokens_in": 0, "tokens_out": 0, "cost_cents": 0.0}
+    extra: dict[str, Any] = {}
+    if litellm.supports_reasoning(model):
+        # On a reasoning model `max_tokens` bounds reasoning tokens as well as content, so the
+        # turn budget that exists to cap the persona's *spoken* length is partly spent thinking,
+        # and every reasoning token is generated before the first word anyone can hear. Measured
+        # against `groq/openai/gpt-oss-20b` on 2026-09-27, one short prompt, 6 calls each:
+        # uncapped 51-91 reasoning tokens per reply, `low` 8-11. That is latency the user waits
+        # through for text they never receive, on a path whose whole budget is 1400 ms.
+        #
+        # Honesty note, because the first version of this comment claimed more: this was written
+        # while diagnosing 48 apparently-empty generations in a Level 2 run, and those turned out
+        # to be Groq rate-limit errors, not token starvation (which is why `generation_error:*` is
+        # now a distinct violation reason below). The reasoning-token measurement above is real and
+        # the TTFT argument stands on its own; the effect on empty replies is NOT measured, and no
+        # end-to-end TTFT comparison has been run against the hosted model because the daily quota
+        # is exhausted. Non-reasoning models (the local Ollama persona) never see this parameter.
+        extra["reasoning_effort"] = get_settings().persona_reasoning_effort
     stream = await litellm.acompletion(
         model=model,
         messages=messages,
         stream=True,
         stream_options={"include_usage": True},
         max_tokens=max_tokens,
+        **extra,
     )
     async for chunk in stream:
         delta = chunk.choices[0].delta.content if chunk.choices else None
@@ -137,15 +156,30 @@ async def generate_persona_reply(
         messages = list(base_messages)
         if reinforcement:
             messages.append({"role": "system", "content": reinforcement})
+        generation_error: str | None = None
         try:
             text, ttft_ms, usage = await _stream_full_reply(model, messages, max_tokens)
-        except Exception:
-            logger.warning("persona_generation_failed", model=model, attempt=attempt)
+        except Exception as exc:
+            generation_error = type(exc).__name__
+            logger.warning(
+                "persona_generation_failed", model=model, attempt=attempt, error=generation_error
+            )
             text, ttft_ms, usage = "", None, last_usage
         last_ttft_ms, last_usage = ttft_ms, usage
 
         if not text.strip():
-            all_violations.append("empty_reply")
+            # `generation_error:*` and `empty_reply` are deliberately different reasons. They were
+            # the same reason (`empty_reply`) until 2026-09-27, and that cost real time and
+            # produced a wrong answer: a Level 2 run (eval_runs 01a0e409) recorded 48 empty
+            # generations in 72 replies and the natural reading was that the model had been
+            # starved of output tokens by its own reasoning. They were Groq rate-limit errors. A
+            # provider outage and a model that genuinely said nothing need completely different
+            # fixes, an evaluation that cannot tell them apart will publish a number about the
+            # wrong thing, and this is the second hosted Level 2 run to be invalidated by exactly
+            # that confusion (the first is in README's Level 2 section, 2026-09-16).
+            all_violations.append(
+                f"generation_error:{generation_error}" if generation_error else "empty_reply"
+            )
             reinforcement = _REINFORCEMENT_EMPTY
             continue
 

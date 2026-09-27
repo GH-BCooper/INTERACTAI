@@ -110,6 +110,10 @@ class TestPraiseDetection:
             "Spot on. Why that order?",
             "I like that. What did the data say?",
             "Great job on that one. Next question.",
+            # Both observed in the 2026-09-27 Level 2 run and missed by the first version of the
+            # list — the judge labelled both as praise.
+            "That sounds like a significant improvement. What did you measure?",
+            "That sounds reasonable. And who signed off on it?",
         ):
             assert contains_praise(reply), reply
             assert any(v.startswith("praise:") for v in check_reply(reply, STATIC_PROMPT)), reply
@@ -140,6 +144,9 @@ class TestPraiseDetection:
             "Is that a good trade-off for a team of four?",
             "What made it a strong candidate for caching?",
             "How would you know if the job was done well?",
+            # Neutral "that sounds like ..." observations, which must keep passing.
+            "That sounds like a lot of work for one quarter. Who else was on it?",
+            "That sounds like it was mostly someone else's call. Was it?",
         ):
             assert contains_praise(reply) == [], reply
 

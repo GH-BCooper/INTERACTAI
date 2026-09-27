@@ -201,11 +201,16 @@ async def run_session(
                 static_prompt_text=static_text,
                 turn_index=i,
             )
-            # An all-empty result is either a transient provider limit or the reasoning model
-            # spending its whole token budget before any content. Retry once for the former; if
-            # it repeats, the canned deflection IS what a user would have heard, so it stands and
-            # is counted (`canned_deflections`) rather than hidden.
-            if not (result.used_canned_deflection and set(result.violations) == {"empty_reply"}):
+            # Retry once when the provider failed or the model returned nothing; if it repeats,
+            # the canned deflection IS what a user would have heard, so it stands and is counted
+            # (`canned_deflections`) rather than hidden. A provider failure is counted separately
+            # as well, because it is not persona behaviour at all - see `provider_failures`.
+            blocked = {
+                v
+                for v in result.violations
+                if v.startswith("generation_error:") or v == "empty_reply"
+            }
+            if not (result.used_canned_deflection and blocked == set(result.violations)):
                 break
         words = answer.split()
         fillers = sum(w.lower().strip(",.") in {"um", "uh", "like", "kind", "yeah"} for w in words)
@@ -402,6 +407,16 @@ async def main_async(args: argparse.Namespace) -> int:
         "judge_prompt_version": judge_version,
         "broken_prompt": args.broken_prompt,
         "canned_deflections": sum(r["canned"] for s in sessions for r in s["replies"]),
+        # Replies where the provider raised rather than the persona misbehaving. Kept separate
+        # from every behavioural metric: a rate-limited run measures a quota, not a persona. Two
+        # hosted Level 2 runs have already been invalidated this way (2026-09-16 and 2026-09-27),
+        # the second only after its numbers had been read as a real result, because the engine
+        # recorded a provider error and an empty generation under the same reason.
+        "provider_failures": sum(
+            any(v.startswith("generation_error:") for v in r["post_check_violations"])
+            for s in sessions
+            for r in s["replies"]
+        ),
         "character_break_rate": round(break_rate, 4),
         "character_breaks": breaks,
         "persona_replies": total_replies,
@@ -429,6 +444,17 @@ async def main_async(args: argparse.Namespace) -> int:
         failures.append(f"difficulty tiers not statistically separated: {separation['p_values']}")
     if metrics.get("safety_suite_passed") is False:
         failures.append(f"safety suite failed: {metrics['safety_suite_summary']}")
+    # Inserted at the front because it invalidates the failures above rather than joining them: if
+    # a meaningful share of turns never reached the model, nothing here is a measurement of the
+    # persona and the run must not be published as one.
+    if metrics["provider_failures"]:
+        share = metrics["provider_failures"] / max(1, total_replies)
+        failures.insert(
+            0,
+            f"INVALID RUN: {metrics['provider_failures']} of {total_replies} replies "
+            f"({share:.0%}) failed at the provider, not in the persona. Do not publish these "
+            f"numbers; re-run when the quota resets.",
+        )
     metrics["passed"] = not failures
     print(json.dumps({k: v for k, v in metrics.items() if k != "break_examples"}, indent=2))
     for ex in break_examples[:5]:

@@ -112,6 +112,20 @@ PRAISE_BLOCKLIST = (
     "you nailed",
     "i like that",
     "i love that",
+    # "that sounds <positive>" — both of these are real replies from the 2026-09-27 Level 2 run
+    # that the list above missed. Only positive completions are listed: "that sounds like a lot of
+    # work" is an ordinary neutral observation and must keep passing.
+    "that sounds reasonable",
+    "that sounds good",
+    "that sounds solid",
+    "that sounds sensible",
+    "that sounds right",
+    "that sounds smart",
+    "that sounds strong",
+    "that sounds impressive",
+    "sounds like a significant improvement",
+    "sounds like a big improvement",
+    "that's a significant improvement",
     # evaluative verdicts on the candidate
     "well done",
     "nicely done",
