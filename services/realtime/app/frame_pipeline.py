@@ -14,7 +14,12 @@ import numpy as np
 from .asr.whisper import transcribe_partial
 from .core.config import get_settings
 from .core.logging import get_logger
-from .endpointing.cascade import EndpointDecision, is_utterance_too_short, resolve_endpoint
+from .endpointing.cascade import (
+    EndpointDecision,
+    exceeds_ramble_word_cap,
+    is_utterance_too_short,
+    resolve_endpoint,
+)
 from .metrics.latency import LatencyRecorder
 from .persona.memory import split_recent_and_older, summarize_history
 from .schemas.ws import ServerMachineState
@@ -96,6 +101,9 @@ async def handle_speech_window(
         utt = UtteranceBuffer(start_ms=int(now_ms))
         utt.append(window)
         runtime.current_utterance = utt
+        # A new utterance means the candidate stopped and started again, so the previous ramble
+        # interruption is over and ordinary stop-on-speech applies from here.
+        runtime.ramble_interrupt_active = False
         await sink.send_state_change("listening")
         return
 
@@ -140,6 +148,32 @@ async def handle_speech_window(
             # model; summarizing is a different role even when both happen to resolve to the
             # same underlying model today.
             asyncio.create_task(_run_compaction(runtime, get_settings().model_narrator))
+        # Task 2.3c: the hard tier's `interrupt_over_words`, enforced here rather than trusted to
+        # the prompt. This is the one place the persona ends a user turn the user has not
+        # finished, so it goes through `endpointing` rather than straight to `thinking`:
+        # `listening -> thinking` is not a legal transition (state_machine.py) and the protocol
+        # and the transition table both stay untouched. This is not full-duplex barge-in
+        # (CLAUDE.md §9 anti-scope) — we stop listening, then speak, exactly as on a normal
+        # endpoint. What changes is who decided the turn was over.
+        if exceeds_ramble_word_cap(listening_utt.partial_transcript, _ramble_word_cap(runtime)):
+            listening_utt.interrupted_ramble = True
+            runtime.ramble_interrupt_active = True
+            logger.info(
+                "persona_interrupt_ramble",
+                session_id=str(runtime.session_id),
+                words=len(listening_utt.partial_transcript.split()),
+                cap=_ramble_word_cap(runtime),
+            )
+            await sink.send_state_change("endpointing")
+            _start_turn(
+                resources=resources,
+                latency=latency,
+                sink=sink,
+                runtime=runtime,
+                utt=listening_utt,
+                now_ms=now_ms,
+            )
+            return
         if not is_speech:
             await sink.send_state_change("endpointing")
         return
@@ -175,30 +209,63 @@ async def handle_speech_window(
             await sink.send_state_change("idle")
             return
 
-        endpoint_detect_ms = (time.perf_counter() - utt.last_voiced_monotonic) * 1000
-        end_ms = int(now_ms)
-        turn_index = runtime.turn_index
-        runtime.turn_index += 1
-        runtime.current_utterance = None
-        progress = TurnProgress()
-        runtime.turn_progress = progress
-        runtime.speaking_task = asyncio.create_task(
-            process_turn(
-                resources=resources,
-                latency=latency,
-                sink=sink,
-                runtime=runtime,
-                endpoint_detect_ms=endpoint_detect_ms,
-                last_voiced_monotonic=utt.last_voiced_monotonic,
-                session_id=runtime.session_id,
-                turn_index=turn_index,
-                utterance=utt,
-                end_ms=end_ms,
-                adaptive_threshold=runtime.adaptive_threshold,
-                progress=progress,
-            )
+        _start_turn(
+            resources=resources,
+            latency=latency,
+            sink=sink,
+            runtime=runtime,
+            utt=utt,
+            now_ms=now_ms,
         )
         return
+
+
+def _start_turn(
+    *,
+    resources: PipelineResources,
+    latency: LatencyRecorder,
+    sink: WsTurnSink,
+    runtime: SessionRuntime,
+    utt: UtteranceBuffer,
+    now_ms: float,
+) -> None:
+    """Hand one finished utterance to `process_turn`. Extracted so the normal endpoint path and
+    the hard tier's ramble interrupt (`interrupt_over_words`) start a turn in exactly the same
+    way — the only difference between them is `utt.interrupted_ramble`, which the persona's
+    dynamic layer reads."""
+    endpoint_detect_ms = (time.perf_counter() - utt.last_voiced_monotonic) * 1000
+    end_ms = int(now_ms)
+    turn_index = runtime.turn_index
+    runtime.turn_index += 1
+    runtime.current_utterance = None
+    progress = TurnProgress()
+    runtime.turn_progress = progress
+    runtime.speaking_task = asyncio.create_task(
+        process_turn(
+            resources=resources,
+            latency=latency,
+            sink=sink,
+            runtime=runtime,
+            endpoint_detect_ms=endpoint_detect_ms,
+            last_voiced_monotonic=utt.last_voiced_monotonic,
+            session_id=runtime.session_id,
+            turn_index=turn_index,
+            utterance=utt,
+            end_ms=end_ms,
+            adaptive_threshold=runtime.adaptive_threshold,
+            progress=progress,
+        )
+    )
+
+
+def _ramble_word_cap(runtime: SessionRuntime) -> int | None:
+    """`interrupt_over_words` for this session's tier, or None when the tier does not interrupt
+    (gentle and standard) or there is no compiled brief at all (persona stub, CLI harness)."""
+    ctx = runtime.persona_context
+    if ctx is None:
+        return None
+    cap = getattr(getattr(ctx, "difficulty", None), "interrupt_over_words", None)
+    return int(cap) if cap is not None else None
 
 
 async def handle_interrupt_window(*, runtime: SessionRuntime, window: np.ndarray) -> bool:
@@ -207,6 +274,13 @@ async def handle_interrupt_window(*, runtime: SessionRuntime, window: np.ndarray
     if runtime.vad is None:
         raise RuntimeError("handle_interrupt_window called before a VAD session was attached")
     is_speech = runtime.vad.observe(window)
+    if runtime.ramble_interrupt_active:
+        # Task 2.3c: the persona is mid-interruption and the candidate is still finishing the
+        # sentence we cut into. Their trailing speech must not cancel the interruption — that
+        # would make the hard tier's one real escalation unusable in exactly the case it exists
+        # for. The guard is held at zero so a genuine later barge-in starts from scratch.
+        runtime.interrupt_guard_ms = 0.0
+        return False
     if is_speech:
         runtime.interrupt_guard_ms += WINDOW_MS
         if runtime.interrupt_guard_ms >= INTERRUPT_GUARD_MS:

@@ -26,7 +26,18 @@ def _load_pcm_float(path: Path) -> np.ndarray:
 
 @pytest.fixture(scope="module")
 def model() -> WhisperModel:
-    return WhisperModel("base.en", device="cpu", compute_type="int8")
+    """`cpu_threads=1, num_workers=1` is load-bearing, not tidiness. CLAUDE.md §7 requires the
+    audio tests to be deterministic, and left to its default CTranslate2 sizes its intra-op thread
+    pool from the available cores, so the order in which partial sums are reduced — and therefore
+    the logits, and therefore the chosen tokens — depends on how busy the machine is.
+
+    Observed on 2026-09-27: `test_initial_prompt_biasing_recognizes_uncommon_term` passed alone and
+    passed with this module alone, but failed twice in full-suite runs where other tests were
+    competing for CPU, decoding `spotbies` instead of `spotmies` *with* the vocabulary hint in
+    place. That is a flaky test, not a flaky feature. Pinning to one thread fixes the reduction
+    order, so the same fixture yields the same tokens on a busy machine and a quiet one. It costs
+    a little wall time and buys a result that means something when it fails."""
+    return WhisperModel("base.en", device="cpu", compute_type="int8", cpu_threads=1, num_workers=1)
 
 
 @pytest.mark.asyncio

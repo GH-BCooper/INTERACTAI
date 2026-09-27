@@ -19,6 +19,7 @@ from services.realtime.app.endpointing.cascade import (
     EndpointDecision,
     EndpointState,
     exceeds_max_turn_length,
+    exceeds_ramble_word_cap,
     is_utterance_too_short,
     resolve_endpoint,
     should_endpoint,
@@ -255,3 +256,30 @@ def test_adaptive_threshold_clamps_to_min() -> None:
     for _ in range(3):
         tracker.record_utterance([10.0, 20.0])
     assert tracker.current_threshold_ms() == tracker.min_ms
+
+
+class TestRambleWordCap:
+    """Task 2.3c's `interrupt_over_words`, enforced in code. Level 2 (Task 6.3b) measured the
+    interruption rate at 0.0 on every tier including hard, because the cap existed only as a
+    sentence in the prompt and the model ignored it."""
+
+    def test_gentle_and_standard_never_interrupt(self) -> None:
+        """`cap is None` on both tiers (content/scenarios/*.yaml). If this returned True the
+        ladder would collapse into one tier, which is the opposite of the defect being fixed."""
+        assert exceeds_ramble_word_cap("word " * 500, None) is False
+
+    def test_hard_tier_interrupts_past_the_cap(self) -> None:
+        assert exceeds_ramble_word_cap("word " * 121, 120) is True
+
+    def test_at_the_cap_it_does_not_yet_interrupt(self) -> None:
+        assert exceeds_ramble_word_cap("word " * 120, 120) is False
+        assert exceeds_ramble_word_cap("word " * 119, 120) is False
+
+    def test_an_empty_or_short_partial_never_interrupts(self) -> None:
+        assert exceeds_ramble_word_cap("", 120) is False
+        assert exceeds_ramble_word_cap("I led the payments migration.", 120) is False
+
+    def test_whitespace_runs_are_not_counted_as_words(self) -> None:
+        """The partial transcript arrives with irregular spacing and newlines; `.split()` with no
+        argument collapses them, so a long pause does not fake a long ramble."""
+        assert exceeds_ramble_word_cap("  one   two \n\n three  ", 3) is False

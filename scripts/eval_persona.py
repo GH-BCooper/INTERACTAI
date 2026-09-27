@@ -147,6 +147,7 @@ def separation_verdict(per_session: dict[str, dict[str, list[float]]]) -> dict[s
 async def run_session(
     *, model: str, planner: str, brief: dict[str, Any], answers: list[str], static_text: str
 ) -> dict[str, Any]:
+    from app.endpointing.cascade import exceeds_ramble_word_cap
     from app.persona.engine import generate_persona_reply
     from app.persona.opening import generate_opening_line
     from app.persona.prompt import DynamicContext, build_persona_context_from_brief
@@ -167,15 +168,26 @@ async def run_session(
     if opening:
         turns.append({"speaker": "persona", "text": opening})
     replies: list[dict[str, Any]] = []
+    cap = ctx.difficulty.interrupt_over_words
     for i, answer in enumerate(answers):
         topic = current_topic(plan)
+        # Task 2.3c, as the realtime service actually behaves. `interrupt_over_words` is enforced
+        # in `frame_pipeline` (it forces the endpoint mid-utterance), not left to the model, so an
+        # eval that feeds the whole ramble in and waits to see whether the model volunteers an
+        # interruption measures something no user ever experiences. On the hard tier the audio is
+        # cut at the cap, so the persona sees roughly the first `cap` words and is told it is
+        # interrupting — which is what is reproduced here. Gentle and standard have no cap and are
+        # untouched, so the tiers stay genuinely different.
+        interrupted = exceeds_ramble_word_cap(answer, cap)
+        speech = " ".join(answer.split()[:cap]) if interrupted and cap is not None else answer
         dyn = DynamicContext(
-            candidate_speech=answer,
+            candidate_speech=speech,
             recent_turns=turns[-6:],
             elapsed_minutes=i * 2,
             target_minutes=ctx.target_minutes,
             plan_topic=topic["topic"] if topic else None,
             pending_obligation=plan.get("pending_obligation"),
+            interrupted_ramble=interrupted,
         )
         for backoff_s in (PACE_S, 90):
             # Paced under the provider's free-tier tokens-per-minute limit: a rate-limited call

@@ -129,6 +129,27 @@ def is_utterance_too_short(utterance_duration_ms: float) -> bool:
     return utterance_duration_ms < MIN_UTTERANCE_MS
 
 
+def exceeds_ramble_word_cap(transcript: str, cap: int | None) -> bool:
+    """Task 2.3c's `interrupt_over_words`, enforced in code rather than left to the prompt.
+
+    Level 2 (Task 6.3b, 2026-09-16) measured interruptions at 0.0 on every tier including hard,
+    against a >120-word ramble — the instruction was rendered into the brief layer and the model
+    simply never acted on it, so the top of the difficulty ladder was decorative. The other two
+    hard-tier parameters (`silence_after_answer_ms`, `followups_on_vague`) were already enforced
+    in `turn.py`; this one was not.
+
+    `cap is None` (gentle and standard) means never interrupt, so the tiers stay genuinely
+    different rather than all becoming the same. Counted on the *partial* transcript, which is
+    what exists while the candidate is still talking, so this is deliberately approximate — the
+    partial can lag the audio by up to one partial-transcript interval. That is acceptable: the
+    threshold is "roughly 120 words" in the prompt text too, and an interruption a few words late
+    is still an interruption.
+    """
+    if cap is None:
+        return False
+    return len(transcript.split()) > cap
+
+
 def exceeds_max_turn_length(utterance_duration_ms: float) -> bool:
     """Task 1.3c guard: the caller uses this to log `persona_interrupt` rather than a normal
     endpoint when `should_endpoint` returns END for this reason."""

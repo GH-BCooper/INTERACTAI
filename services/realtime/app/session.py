@@ -60,6 +60,12 @@ class SessionRuntime:
     turn_progress: object | None = None  # turn.TurnProgress; same reason
     latency_recorder: object | None = None  # metrics.latency.LatencyRecorder; same reason
     interrupt_guard_ms: float = 0.0
+    # Task 2.3c: set while the persona is delivering a ramble interruption it initiated itself
+    # (`interrupt_over_words`). Suppresses stop-on-speech for that one reply — the candidate is
+    # by definition still mid-sentence when we cut them off, so the ordinary barge-in rule would
+    # cancel the interruption the instant it began and nothing would ever be heard. Cleared when
+    # the candidate starts a fresh utterance.
+    ramble_interrupt_active: bool = False
     muted: bool = False
     persona_stub: bool = False
     voice_id: str = "en_US-lessac-medium"

@@ -167,6 +167,10 @@ class UtteranceBuffer:
     )
     partial_transcript: str = ""
     windows_since_partial: int = 0
+    # Task 2.3c: set when the hard tier's `interrupt_over_words` cap forced this turn to end
+    # while the candidate was still speaking, so the persona knows it cut them off and can
+    # redirect rather than replying as if they had finished.
+    interrupted_ramble: bool = False
     last_voiced_monotonic: float = field(default_factory=time.perf_counter)
     partial_in_flight: bool = False
 
@@ -338,6 +342,7 @@ async def process_turn(
                 runtime,
                 candidate_speech=text_for_persona,
                 target_minutes=persona_context.target_minutes,
+                interrupted_ramble=utterance.interrupted_ramble,
             )
 
     chunker = SentenceChunker()
@@ -548,7 +553,11 @@ def _make_synth_fn(resources: PipelineResources) -> SynthFn:
 
 
 def _build_dynamic_context(
-    runtime: SessionRuntime, *, candidate_speech: str, target_minutes: int
+    runtime: SessionRuntime,
+    *,
+    candidate_speech: str,
+    target_minutes: int,
+    interrupted_ramble: bool = False,
 ) -> DynamicContext:
     """Task 2.3a's per-turn dynamic layer, assembled from the runtime state Task 2.3b/2.3d
     maintain. Pure with respect to `runtime` — reads only, mutation happens after generation
@@ -564,4 +573,5 @@ def _build_dynamic_context(
         target_minutes=target_minutes,
         plan_topic=str(topic["topic"]) if topic else None,
         pending_obligation=obligation if isinstance(obligation, str) else None,
+        interrupted_ramble=interrupted_ramble,
     )

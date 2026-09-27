@@ -6,6 +6,7 @@ from services.realtime.app.persona.safety import (
     CANNED_DEFLECTIONS,
     check_reply,
     contains_coaching_phrase,
+    contains_praise,
     contains_rubric_leak,
     contains_system_prompt_fragment,
     has_multiple_questions,
@@ -88,3 +89,69 @@ class TestCheckReplyIntegration:
 def test_canned_deflections_are_deterministic_by_turn_index() -> None:
     assert pick_canned_deflection(0) == pick_canned_deflection(len(CANNED_DEFLECTIONS))
     assert pick_canned_deflection(0) in CANNED_DEFLECTIONS
+
+
+class TestPraiseDetection:
+    """Task 6.3b found this hole with a live judge: the Level 2 run on 2026-09-16 measured a
+    character-break rate of 0.05 (3 of 60) and *all three* were praise, which the coaching and
+    grading lists above do not match. These are the real measured replies where that is quoted."""
+
+    def test_the_exact_reply_level_2_caught_is_flagged(self) -> None:
+        reply = "Sure, that's impressive. Can you tell me more about how you handled the rollout?"
+        assert contains_praise(reply) == ["that's impressive"]
+        assert any(v.startswith("praise:") for v in check_reply(reply, STATIC_PROMPT))
+
+    def test_verdicts_on_the_answer_are_flagged(self) -> None:
+        for reply in (
+            "Good answer. What happened next?",
+            "That was a strong example — who else was involved?",
+            "Well done. Let's move on to the design question.",
+            "You explained that clearly. What would you change?",
+            "Spot on. Why that order?",
+            "I like that. What did the data say?",
+            "Great job on that one. Next question.",
+        ):
+            assert contains_praise(reply), reply
+            assert any(v.startswith("praise:") for v in check_reply(reply, STATIC_PROMPT)), reply
+
+    def test_neutral_acknowledgements_are_not_praise(self) -> None:
+        """The judge explicitly rules these are NOT breaks, and the difficulty ladder needs
+        acknowledgements to exist at all (`ack_length`: long / short / minimal). Over-blocking
+        here would spend a regeneration and then a canned deflection on a correct reply."""
+        for reply in (
+            "Okay. What happened next?",
+            "Right — and who owned that decision?",
+            "Got it. Walk me through the rollback.",
+            "I see. How long did that take?",
+            "Thanks. Let's talk about the schema.",
+            "Mm. And then?",
+            "Understood. What was the actual number?",
+        ):
+            assert contains_praise(reply) == [], reply
+            assert check_reply(reply, STATIC_PROMPT) == [], reply
+
+    def test_ordinary_questions_containing_praise_words_are_not_flagged(self) -> None:
+        """Bare adjectives are deliberately not in the list: the persona has legitimate reasons
+        to use every one of these words inside a question, and a false positive costs a
+        regeneration on the latency path."""
+        for reply in (
+            "What's the most impressive system you've built?",
+            "In a perfect world, how would you have staffed it?",
+            "Is that a good trade-off for a team of four?",
+            "What made it a strong candidate for caching?",
+            "How would you know if the job was done well?",
+        ):
+            assert contains_praise(reply) == [], reply
+
+    def test_praise_is_reported_separately_from_coaching(self) -> None:
+        """The Level 2 report distinguishes praise from coaching and grading, so the violation
+        reason has to as well — otherwise the next regression looks like the same bug."""
+        violations = check_reply("Good answer. Next time try using STAR.", STATIC_PROMPT)
+        assert any(v.startswith("praise:") for v in violations)
+        assert any(v.startswith("coaching_phrase:") for v in violations)
+
+    def test_a_distress_exit_is_never_blocked_for_praise(self) -> None:
+        """Same invariant as the rest of `check_reply`: the one reply that must never be
+        discarded (AS-07) still passes even if it happens to contain a listed phrase."""
+        reply = "I'm pausing this practice session. You did well to say that out loud."
+        assert check_reply(reply, STATIC_PROMPT) == []

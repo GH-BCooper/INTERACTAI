@@ -53,6 +53,86 @@ COACHING_BLOCKLIST = (
     "tip for next time",
 )
 
+# Level 2 (Task 6.3b) found the real hole in the list above: every character break the persona
+# judge caught in the 2026-09-16 run was *praise* ("Sure, that's impressive. Can you tell me more
+# about…"), which is evaluative feedback on answer quality and so a break by the judge's own
+# definition (content/prompts/eval/persona-judge.v1.md), but contains no coaching or grading
+# phrase. Praise is matched as whole phrases, never bare adjectives, because the persona has
+# legitimate reasons to say "impressive" ("what's the most impressive system you've built?") or
+# "perfect" ("in a perfect world…") inside an ordinary question. The judge explicitly rules that
+# neutral acknowledgements ("Okay.", "Thanks.", "Got it.", "I see.") are NOT breaks, and the
+# difficulty ladder depends on acknowledgements existing at all (`ack_length`), so nothing here
+# may match a bare acknowledgement.
+PRAISE_BLOCKLIST = (
+    # evaluative verdicts on the answer/example itself
+    "good answer",
+    "great answer",
+    "strong answer",
+    "excellent answer",
+    "solid answer",
+    "nice answer",
+    "perfect answer",
+    "compelling answer",
+    "good example",
+    "great example",
+    "strong example",
+    "excellent example",
+    "perfect example",
+    "good point",
+    "great point",
+    "excellent point",
+    # evaluative verdicts phrased as a reaction
+    "that's impressive",
+    "that is impressive",
+    "very impressive",
+    "quite impressive",
+    "pretty impressive",
+    "impressive work",
+    "i'm impressed",
+    "i am impressed",
+    "that's great",
+    "that is great",
+    "that's excellent",
+    "that is excellent",
+    "that's fantastic",
+    "that's wonderful",
+    "that's brilliant",
+    "that's terrific",
+    "that's perfect",
+    "that's exactly right",
+    "exactly what i was looking for",
+    "that was great",
+    "that was excellent",
+    "that was a strong",
+    "that was really good",
+    "that's really good",
+    "that's very good",
+    "spot on",
+    "nailed it",
+    "you nailed",
+    "i like that",
+    "i love that",
+    # evaluative verdicts on the candidate
+    "well done",
+    "nicely done",
+    "well put",
+    "nicely put",
+    "well explained",
+    "explained that clearly",
+    "explained that well",
+    "good job",
+    "great job",
+    "nice job",
+    "good work",
+    "great work",
+    "you did well",
+    "you handled that well",
+    # Not bare "strong candidate": "what made it a strong candidate for caching?" is ordinary
+    # technical English and a false positive here costs a regeneration on the latency path.
+    "you're a strong candidate",
+    "you are a strong candidate",
+)
+
 _QUESTION_MARK = re.compile(r"\?")
 
 
@@ -64,6 +144,13 @@ def contains_rubric_leak(text: str) -> list[str]:
 def contains_coaching_phrase(text: str) -> list[str]:
     lowered = text.lower()
     return [phrase for phrase in COACHING_BLOCKLIST if phrase in lowered]
+
+
+def contains_praise(text: str) -> list[str]:
+    """Separate from `contains_coaching_phrase` so a violation reason says which rule fired —
+    the Level 2 report distinguishes praise from coaching and grading, and so should the log."""
+    lowered = text.lower()
+    return [phrase for phrase in PRAISE_BLOCKLIST if phrase in lowered]
 
 
 def contains_system_prompt_fragment(text: str, static_prompt_text: str) -> bool:
@@ -108,6 +195,8 @@ def check_reply(text: str, static_prompt_text: str) -> list[str]:
         violations.append(f"rubric_leak:{','.join(leaked)}")
     if coaching := contains_coaching_phrase(text):
         violations.append(f"coaching_phrase:{','.join(coaching)}")
+    if praise := contains_praise(text):
+        violations.append(f"praise:{','.join(praise)}")
     if contains_system_prompt_fragment(text, static_prompt_text):
         violations.append("system_prompt_fragment")
     if has_multiple_questions(text):
@@ -119,7 +208,7 @@ DISTRESS_EXIT_MARKER = "i'm pausing this practice session."
 
 
 def is_distress_exit_reply(text: str) -> bool:
-    """Task 2.6 (AS-07): the static prompt (content/prompts/persona/static.v1.md, v1.1.0)
+    """Task 2.6 (AS-07): the static prompt (content/prompts/persona/static.v1.md, v1.2.0)
     requires a real distress-exit reply to open with this exact sentence, word for word — a
     fixed marker rather than open-ended pattern matching on free-generated text, so detecting
     "the persona just broke character for real distress" is a reliable string check, not a

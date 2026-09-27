@@ -9,16 +9,20 @@ SQLAlchemy 2.0's documented `join_transaction_mode="create_savepoint"` pattern.
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
-from collections.abc import AsyncGenerator
+import time
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 
+import pytest
 import pytest_asyncio
 from alembic import command
 from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, create_async_engine
+from testcontainers.core.container import DockerContainer
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -36,6 +40,79 @@ def _run_migrations(database_url: str) -> None:
     cfg.set_main_option("script_location", str(API_DIR / "alembic"))
     cfg.set_main_option("sqlalchemy.url", database_url)
     command.upgrade(cfg, "head")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def s3_container() -> Generator[str]:
+    """Real MinIO in a container, for the same reason Postgres and Redis are (CLAUDE.md §7 names
+    MinIO explicitly: "Integration | pytest + testcontainers | full turn against real
+    Postgres/Redis/MinIO").
+
+    Before this existed the object-storage tests signed against whatever `S3_*` in the developer's
+    `.env` happened to point at. On 2026-09-27 that was a hosted Supabase Storage project which had
+    auto-paused, so `TestDeleteMe` failed with `410 Gone` — a green suite depended on an external
+    service being awake, and a red one said nothing about the code. Autouse and session-scoped so
+    no test can accidentally reach the outside world instead.
+
+    The generic `DockerContainer` plus boto3 is deliberate: `testcontainers.minio` needs the `minio`
+    package, and boto3 is already a dependency and is also what the code under test uses.
+    """
+    import boto3
+
+    container = (
+        DockerContainer("minio/minio")
+        .with_command("server /data")
+        .with_env("MINIO_ROOT_USER", "minioadmin")
+        .with_env("MINIO_ROOT_PASSWORD", "minioadmin")  # noqa: S106
+        .with_exposed_ports(9000)
+    )
+    with container as running:
+        endpoint = f"http://{running.get_container_host_ip()}:{running.get_exposed_port(9000)}"
+        bucket = "interactai-test"
+        # The container's own throwaway root credentials, created three lines above — not a
+        # secret, which is why S105/S106 are suppressed rather than the value moved.
+        root_user = "minioadmin"
+        root_password = "minioadmin"  # noqa: S105
+        os.environ["S3_ENDPOINT"] = endpoint
+        os.environ["S3_ACCESS_KEY"] = root_user
+        os.environ["S3_SECRET_KEY"] = root_password
+        os.environ["S3_BUCKET"] = bucket
+        os.environ["S3_REGION"] = "us-east-1"
+        os.environ["S3_FORCE_PATH_STYLE"] = "true"
+        _reset_s3_caches()
+
+        client = boto3.client(
+            "s3",
+            endpoint_url=endpoint,
+            aws_access_key_id=root_user,
+            aws_secret_access_key=root_password,
+            region_name="us-east-1",
+            config=boto3.session.Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+        )
+        # MinIO reports healthy before it will answer S3 calls; poll the API itself rather than
+        # grepping the log, which has changed wording between images.
+        deadline = time.monotonic() + 60
+        while True:
+            try:
+                client.create_bucket(Bucket=bucket)
+                break
+            except Exception:  # noqa: BLE001 — any failure here is "not ready yet"
+                if time.monotonic() > deadline:
+                    raise
+                time.sleep(0.5)
+        yield endpoint
+    _reset_s3_caches()
+
+
+def _reset_s3_caches() -> None:
+    """`get_settings` and `get_s3_client` are both `lru_cache`d, so the environment has to be set
+    before either is first called — and cleared here in case an earlier import already called
+    them."""
+    from services.api.app.core.config import get_settings as api_get_settings
+    from services.api.app.core.s3 import get_s3_client
+
+    api_get_settings.cache_clear()
+    get_s3_client.cache_clear()
 
 
 @pytest_asyncio.fixture(scope="session")

@@ -105,6 +105,10 @@ class DynamicContext:
     target_minutes: int | None = None
     plan_topic: str | None = None
     pending_obligation: str | None = None
+    # Task 2.3c: True when the hard tier's `interrupt_over_words` cap ended the candidate's turn
+    # while they were still talking. The candidate's speech below is then a fragment, not an
+    # answer, and the reply has to read as an interruption or the whole thing looks like a bug.
+    interrupted_ramble: bool = False
 
 
 def render_brief(ctx: PersonaContext) -> str:
@@ -131,6 +135,7 @@ def render_dynamic(ctx: DynamicContext) -> str:
         target_minutes=ctx.target_minutes,
         plan_topic=ctx.plan_topic,
         pending_obligation=ctx.pending_obligation,
+        interrupted_ramble=ctx.interrupted_ramble,
     )
     return rendered.strip()
 
