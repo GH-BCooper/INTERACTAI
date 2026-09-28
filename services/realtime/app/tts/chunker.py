@@ -22,7 +22,12 @@ OPEN_BRACKETS = "([{"
 CLOSE_BRACKETS = ")]}"
 _BRACKET_PAIRS = {"(": ")", "[": "]", "{": "}"}
 
-FIRST_CHUNK_MAX_WORDS = 12
+# Tuned by measurement, as docs/phase-2-BUILD Task 2.4 asks for ("test 8 / 12 / 16 and
+# measure tts_first_chunk"). Piper synthesis against the 400ms CHUNK_DEADLINE_MS, p95 of 8
+# calls at steady state: 6 words 310ms, 8 words 669ms, 12 words 633ms, 16 words 880ms. 12 —
+# the original value — missed the deadline on every reply, so the user heard a holding line
+# instead of the persona. 6 is the largest cap that fits with margin (docs/decisions/0029).
+FIRST_CHUNK_MAX_WORDS = 6
 CHUNK_MAX_WORDS = 40
 MIN_WORDS_FOR_CLAUSE_SPLIT = 3
 

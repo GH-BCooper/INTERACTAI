@@ -9,8 +9,14 @@
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+// fileURLToPath, not `.pathname` — a URL percent-encodes the space in this repo's own path
+// ("My Space"), so `.pathname` yielded "D:/My%20Space/..." and every readdirSync below threw
+// ENOENT. The `catch { continue }` in the scan loop swallowed it, so this script scanned
+// **zero files** and printed "Design token check passed" — a green gate guarding nothing,
+// for as long as the repo lived in a path with a space in it. Found 2026-09-28.
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SCAN_DIRS = ["app", "components", "hooks"];
 const EXTENSIONS = new Set([".ts", ".tsx"]);
 const HEX_COLOR = /#[0-9a-fA-F]{3,8}\b/g;
@@ -32,17 +38,26 @@ function walk(dir, out = []) {
 }
 
 let failures = [];
+let scanned = 0;
 
 for (const dir of SCAN_DIRS) {
   const abs = join(ROOT, dir);
   let files = [];
   try {
     walk(abs, files);
-  } catch {
-    continue; // directory doesn't exist yet
+  } catch (err) {
+    // Only a genuinely absent directory is skippable, and even that is reported. Anything else
+    // (a bad ROOT, a permission problem) must be loud: silence here is what hid the bug above.
+    if (err.code !== "ENOENT") throw err;
+    console.warn(`  ! skipped ${dir}/ — not found at ${abs}`);
+    continue;
+  }
+  if (files.length === 0) {
+    failures.push(`${abs}: scanned 0 files — this check would pass vacuously`);
   }
 
   for (const file of files) {
+    scanned += 1;
     const text = readFileSync(file, "utf8");
 
     for (const match of text.matchAll(HEX_COLOR)) {
@@ -67,4 +82,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("Design token check passed: no raw hex colours, score colours properly scoped.");
+console.log(
+  "Design token check passed: no raw hex colours, score colours properly scoped " +
+    `(${scanned} files scanned).`
+);

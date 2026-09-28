@@ -25,7 +25,12 @@ import litellm
 from ..core.config import get_settings
 from ..core.logging import get_logger
 from .prompt import DynamicContext, PersonaContext, assemble_messages
-from .safety import check_reply, pick_canned_deflection
+from .safety import (
+    DISTRESS_EXIT_FALLBACK,
+    check_reply,
+    looks_like_distress,
+    pick_canned_deflection,
+)
 
 logger = get_logger(__name__)
 
@@ -73,6 +78,22 @@ class PersonaReplyResult:
     attempts: int
     used_canned_deflection: bool
     violations: list[str]
+
+    @property
+    def failed_on_provider_error(self) -> bool:
+        """True when this result has no real reply in it *and* the reason was the provider
+        rather than the model's own words — every attempt raised (429, timeout, outage), so
+        `text` is the canned deflection.
+
+        Task 2.1's degraded table routes "persona model 429 / error" to MODEL_PERSONA_LOCAL for
+        the remainder of the session, and this is what lets the caller tell that case apart from
+        a model that answered but kept breaking character. Those need opposite responses: a
+        different provider fixes the first and would do nothing for the second."""
+        return (
+            self.used_canned_deflection
+            and bool(self.violations)
+            and all(v.startswith("generation_error:") for v in self.violations)
+        )
 
 
 async def _stream_full_reply(
@@ -204,6 +225,31 @@ async def generate_persona_reply(
         all_violations.extend(violations)
         logger.warning("persona_reply_check_failed", violations=violations, attempt=attempt)
         reinforcement = _REINFORCEMENT_VIOLATION
+
+    # AS-07 backstop. Every attempt failed, so there is no model reply to judge — and a canned
+    # deflection is the one answer that must never go to someone describing real danger. See
+    # `looks_like_distress`: with the hosted model's quota exhausted, "I don't think I want to be
+    # alive after this." was answered with "Let's stay focused on the conversation." The distress
+    # exit is recognised downstream by its first sentence, so `turn.py` ends the session and skips
+    # coach enqueue here exactly as it would for a model-generated exit.
+    if looks_like_distress(dynamic_context.candidate_speech):
+        logger.warning(
+            "persona_distress_exit_fallback",
+            reason="no model reply available",
+            violations=all_violations,
+        )
+        return PersonaReplyResult(
+            text=DISTRESS_EXIT_FALLBACK,
+            ttft_ms=last_ttft_ms,
+            total_latency_ms=(time.perf_counter() - t_start) * 1000,
+            tokens_in=int(last_usage["tokens_in"]),
+            tokens_out=int(last_usage["tokens_out"]),
+            cost_cents=float(last_usage["cost_cents"]),
+            cached=False,
+            attempts=MAX_GENERATION_ATTEMPTS,
+            used_canned_deflection=False,
+            violations=all_violations,
+        )
 
     deflection = pick_canned_deflection(turn_index)
     return PersonaReplyResult(

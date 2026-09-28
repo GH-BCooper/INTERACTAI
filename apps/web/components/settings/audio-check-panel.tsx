@@ -78,7 +78,7 @@ export function AudioCheckPanel({ constraints }: { constraints?: MicCaptureConst
           </Button>
         )}
         <MicLevelMeter ref={meterRef} />
-        {heardSomething && <span className="text-xs text-[var(--score-strong)]">We heard you</span>}
+        {heardSomething && <span className="text-xs text-[var(--status-ok)]">We heard you</span>}
       </div>
 
       <div className="mt-3 flex items-center gap-3">
@@ -111,9 +111,9 @@ export function AudioCheckPanel({ constraints }: { constraints?: MicCaptureConst
             </button>
           </div>
         )}
-        {confirmed === true && <span className="text-xs text-[var(--score-strong)]">Speakers working</span>}
+        {confirmed === true && <span className="text-xs text-[var(--status-ok)]">Speakers working</span>}
         {confirmed === false && (
-          <span className="text-xs text-[var(--score-weak)]">Check your output device below</span>
+          <span className="text-xs text-[var(--status-bad)]">Check your output device below</span>
         )}
       </div>
     </div>

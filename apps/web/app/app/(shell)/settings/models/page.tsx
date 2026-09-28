@@ -54,8 +54,8 @@ export default function ModelsSettingsPage() {
         {groq ? (
           <div className="mt-3 flex items-center justify-between rounded-lg border bg-[var(--bg-card)] p-3">
             <div className="flex items-center gap-2 text-sm">
-              {groq.last_test_status === "success" && <CheckCircle2 size={16} className="text-[var(--score-strong)]" />}
-              {groq.last_test_status === "failed" && <XCircle size={16} className="text-[var(--score-weak)]" />}
+              {groq.last_test_status === "success" && <CheckCircle2 size={16} className="text-[var(--status-ok)]" />}
+              {groq.last_test_status === "failed" && <XCircle size={16} className="text-[var(--status-bad)]" />}
               <span>A key is saved ({groq.last_test_status.replace("_", " ")})</span>
             </div>
             <div className="flex gap-2">
@@ -89,7 +89,7 @@ export default function ModelsSettingsPage() {
         )}
 
         {testResult && (
-          <p className={`mt-2 text-xs ${testResult.success ? "text-[var(--score-strong)]" : "text-[var(--score-weak)]"}`}>
+          <p className={`mt-2 text-xs ${testResult.success ? "text-[var(--status-ok)]" : "text-[var(--status-bad)]"}`}>
             {testResult.message}
           </p>
         )}

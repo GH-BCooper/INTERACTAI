@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { LocalDate } from "@/components/ui/local-date";
 import { ScoreBadge } from "@/components/score/score-badge";
 import { StartSessionDialog } from "@/components/dashboard/start-session-dialog";
 import type { ScenarioOut, SessionOut, SessionScoreOut } from "@/lib/api/types";
@@ -52,7 +53,7 @@ export function ReportHeader({
         <h1 className="text-lg font-medium">{scenario?.title ?? "Practice session"}</h1>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">
           {scenario?.family} · {session.target_minutes} min target · {formatDuration(session.duration_ms)} actual ·{" "}
-          {new Date(session.created_at).toLocaleDateString()}
+          <LocalDate value={session.created_at} />
         </p>
         {avgPercentile !== null && (
           <p className="mt-1 text-xs text-[var(--text-tertiary)]">

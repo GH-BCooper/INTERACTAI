@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 
 import pytest
@@ -26,8 +27,16 @@ async def test_stage_records_a_row_with_measured_duration() -> None:
     recorder = LatencyRecorder(writer)
     session_id, turn_id = uuid.uuid4(), uuid.uuid4()
 
+    # Timed against the same clock `stage` uses, rather than asserting the row is >= the
+    # *nominal* sleep. `asyncio.sleep(0.01)` is a floor on the event loop's timer, not on
+    # `perf_counter`, and on Windows the two disagree by more than the interval: this assertion
+    # read `>= 10.0` until 2026-09-28 and failed intermittently under full-suite load at 6.26ms.
+    # What the recorder owes us is that it measures the block it wrapped — not that asyncio's
+    # timer is accurate, which is not this project's code and not this test's subject.
+    started = time.perf_counter()
     async with stage(recorder, session_id, turn_id, Stage.model_ttft):
         await asyncio.sleep(0.01)
+    elapsed_ms = (time.perf_counter() - started) * 1000
 
     await recorder.flush()
     assert len(writer.batches) == 1
@@ -35,7 +44,11 @@ async def test_stage_records_a_row_with_measured_duration() -> None:
     assert row["session_id"] == session_id
     assert row["turn_id"] == turn_id
     assert row["stage"] == "model_ttft"
-    assert row["duration_ms"] >= 10.0
+    assert row["duration_ms"] > 0
+    # Bounded above by the outer measurement, and within a millisecond of it below: anything
+    # wider would also pass for a recorder that timed the wrong thing.
+    assert row["duration_ms"] <= elapsed_ms
+    assert row["duration_ms"] >= elapsed_ms - 1.0
 
 
 @pytest.mark.asyncio

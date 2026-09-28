@@ -104,7 +104,7 @@ export default function DashboardPage() {
             <ScoreBadge score={strip.overall_score} />
             {strip.overall_score_delta !== null && (
               <span
-                className={`font-mono text-xs ${strip.overall_score_delta >= 0 ? "text-[var(--score-strong)]" : "text-[var(--score-weak)]"}`}
+                className={`font-mono text-xs ${strip.overall_score_delta >= 0 ? "text-[var(--status-ok)]" : "text-[var(--status-bad)]"}`}
               >
                 {strip.overall_score_delta >= 0 ? "+" : ""}
                 {strip.overall_score_delta.toFixed(1)}

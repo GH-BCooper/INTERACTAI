@@ -48,6 +48,7 @@ from .tts.piper import (
     IdlePromptCache,
     SynthFn,
     VoicePool,
+    deadline_for_chunk,
     synthesize_with_deadline,
 )
 
@@ -380,6 +381,7 @@ async def process_turn(
                 secondary_voice_id=resources.secondary_voice_id,
                 text=text_chunk,
                 synth=synth,
+                deadline_ms=deadline_for_chunk(text_chunk, is_first_chunk=chunk_seq == 0),
             )
         if result.used_holding_line:
             holding = resources.holding_line.get()
@@ -433,6 +435,34 @@ async def process_turn(
             static_prompt_text=STATIC_TEXT,
             turn_index=turn_index,
         )
+        if reply_result.failed_on_provider_error and not runtime.persona_use_local_for_remainder:
+            # Task 2.1's degraded table: "persona model 429 / error -> switch to
+            # MODEL_PERSONA_LOCAL for the remainder of the session". Until this branch existed
+            # that switch was only reachable from the `thinking` timeout in timeouts.py, which
+            # catches a persona model that is too *slow*. A 429 is the opposite: it comes back in
+            # under 100ms, so the timeout never fired, the flag was never set, and a session
+            # whose hosted quota had run out spoke a canned deflection on every single turn for
+            # the rest of its life while the configured local model sat there unused. That is the
+            # exact failure this table entry was written for (docs/decisions/0030).
+            logger.warning(
+                "persona_provider_failover",
+                session_id=str(session_id),
+                from_model=model,
+                to_model=resources.persona_model_local,
+                violations=reply_result.violations,
+            )
+            runtime.persona_use_local_for_remainder = True
+            await sink.send_degraded(
+                "persona", "Switched to the local persona model for this session.", True
+            )
+            reply_result = await generate_persona_reply(
+                model=resources.persona_model_local,
+                max_tokens=resources.max_tokens_per_turn,
+                persona_context=persona_context,
+                dynamic_context=dynamic_context,
+                static_prompt_text=STATIC_TEXT,
+                turn_index=turn_index,
+            )
         if reply_result.ttft_ms is not None:
             ttft_ms = reply_result.ttft_ms
             stage_ms[StageName.model_ttft.value] = ttft_ms

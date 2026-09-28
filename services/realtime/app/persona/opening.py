@@ -18,8 +18,13 @@ import numpy as np
 from ..core.ids import uuid7
 from ..core.logging import get_logger
 from ..tts.chunker import SentenceChunker
-from ..tts.piper import SynthFn, synthesize_chunk, synthesize_with_deadline
-from .engine import generate_persona_reply
+from ..tts.piper import (
+    SynthFn,
+    deadline_for_chunk,
+    synthesize_chunk,
+    synthesize_with_deadline,
+)
+from .engine import PersonaReplyResult, generate_persona_reply
 from .prompt import STATIC_TEXT, DynamicContext, PersonaContext
 
 if TYPE_CHECKING:
@@ -45,17 +50,27 @@ def _float32_to_int16(samples: np.ndarray) -> np.ndarray:
     return result
 
 
-async def generate_opening_line(
+async def generate_opening_line_result(
     *, model: str, max_tokens: int, persona_context: PersonaContext
-) -> str:
+) -> PersonaReplyResult:
+    """The full result, so `deliver_opening_line` can tell a provider failure (retry elsewhere)
+    from a model that answered badly (don't)."""
     dynamic_context = DynamicContext(candidate_speech=_OPENING_INSTRUCTION)
-    result = await generate_persona_reply(
+    return await generate_persona_reply(
         model=model,
         max_tokens=max_tokens,
         persona_context=persona_context,
         dynamic_context=dynamic_context,
         static_prompt_text=STATIC_TEXT,
         turn_index=OPENING_TURN_INDEX,
+    )
+
+
+async def generate_opening_line(
+    *, model: str, max_tokens: int, persona_context: PersonaContext
+) -> str:
+    result = await generate_opening_line_result(
+        model=model, max_tokens=max_tokens, persona_context=persona_context
     )
     return result.text
 
@@ -77,8 +92,35 @@ async def deliver_opening_line(
         else resources.persona_model
     )
     try:
-        text = await generate_opening_line(
+        opening_result = await generate_opening_line_result(
             model=model, max_tokens=resources.max_tokens_per_turn, persona_context=persona_context
+        )
+        if opening_result.failed_on_provider_error and not runtime.persona_use_local_for_remainder:
+            # Same Task 2.1 degraded-table entry `turn.py` applies to replies, and the opener
+            # needs it more, not less: `generate_persona_reply` never raises, so on a 429 the
+            # `except` below never ran and the scenario's own `opening_strategy` fallback was
+            # unreachable. The session opened on a *generic deflection* — "Let's keep going,
+            # what's your answer?" as the very first thing a candidate hears, before they have
+            # said anything at all (docs/decisions/0030).
+            logger.warning(
+                "persona_provider_failover",
+                session_id=str(runtime.session_id),
+                from_model=model,
+                to_model=resources.persona_model_local,
+                violations=opening_result.violations,
+            )
+            runtime.persona_use_local_for_remainder = True
+            opening_result = await generate_opening_line_result(
+                model=resources.persona_model_local,
+                max_tokens=resources.max_tokens_per_turn,
+                persona_context=persona_context,
+            )
+        # A provider failure that survives the failover leaves the canned deflection in `text`,
+        # which is a worse opener than the scenario's authored line — prefer the latter.
+        text = (
+            persona_context.opening_strategy
+            if opening_result.failed_on_provider_error
+            else opening_result.text
         )
     except Exception:
         logger.warning("opening_line_generation_failed", session_id=str(runtime.session_id))
@@ -104,6 +146,7 @@ async def deliver_opening_line(
             secondary_voice_id=resources.secondary_voice_id,
             text=chunk_text,
             synth=synth_fn,
+            deadline_ms=deadline_for_chunk(chunk_text, is_first_chunk=chunk_seq == 0),
         )
         if result.used_holding_line:
             # Task 1.5b's fallback chain applies here too — a chunk that missed its deadline

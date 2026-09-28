@@ -36,6 +36,8 @@
   --color-accent: var(--accent);
   --color-accent-contrast: var(--accent-contrast);
   --color-danger: var(--danger);
+  --color-status-ok: var(--status-ok);
+  --color-status-bad: var(--status-bad);
   --color-score-strong: var(--score-strong);
   --color-score-developing: var(--score-developing);
   --color-score-weak: var(--score-weak);
@@ -81,22 +83,29 @@
 
   --text-primary: #e8eaed;
   --text-secondary: #9aa1ab;
-  --text-tertiary: #6b7280;
-  --text-on-accent: #ffffff;
+  --text-tertiary: #828996;
+  --text-on-accent: #0b0d10;
 
   --accent: #5b8cff;
   --accent-hover: #7ba0ff;
-  --accent-contrast: #ffffff;
+  --accent-contrast: #0b0d10;
 
   /* RESERVED — rubric values only. Never used for status, errors, links, or decoration. */
   --score-strong: #34c77b;
   --score-developing: #e2a33d;
   --score-weak: #f0576a;
-  --score-insufficient: #6b7280;
+  --score-insufficient: #828996;
+  /* Status, NOT rubric judgement. CLAUDE.md §1 reserves the four --score-* tokens for rubric
+     values, and eleven places were borrowing them for connection state, BYOK key tests, mic/
+     speaker checks and trend arrows — which is exactly the "UI presents status with the same
+     authority as a score" confusion the reservation exists to prevent. Deliberately teal rather
+     than a second green, so a glance cannot mistake one for the other. */
+  --status-ok: #14b8a6;
+  --status-bad: #e15e56;
 
   /* A deliberately distinct red from --score-weak — destructive actions (delete recording, end
      session) are never a rubric judgement, so they never borrow the reserved palette. */
-  --danger: #c9564e;
+  --danger: #d06b63;
   --danger-hover: #d9695f;
 
   --focus-ring: #7ba0ff;
@@ -116,17 +125,19 @@
 
     --text-primary: #14171b;
     --text-secondary: #4b5563;
-    --text-tertiary: #6b7280;
+    --text-tertiary: #5f6673;
     --text-on-accent: #ffffff;
 
     --accent: #3363e0;
     --accent-hover: #2850c2;
     --accent-contrast: #ffffff;
 
-    --score-strong: #16874f;
-    --score-developing: #a6690f;
+    --score-strong: #15804b;
+    --score-developing: #9d630e;
     --score-weak: #c62e46;
-    --score-insufficient: #6b7280;
+    --score-insufficient: #5f6673;
+    --status-ok: #0f766e;
+    --status-bad: #b3261e;
 
     --danger: #b0362f;
     --danger-hover: #98241e;
@@ -144,17 +155,19 @@
 
   --text-primary: #14171b;
   --text-secondary: #4b5563;
-  --text-tertiary: #6b7280;
+  --text-tertiary: #5f6673;
   --text-on-accent: #ffffff;
 
   --accent: #3363e0;
   --accent-hover: #2850c2;
   --accent-contrast: #ffffff;
 
-  --score-strong: #16874f;
-  --score-developing: #a6690f;
+  --score-strong: #15804b;
+  --score-developing: #9d630e;
   --score-weak: #c62e46;
-  --score-insufficient: #6b7280;
+  --score-insufficient: #5f6673;
+  --status-ok: #0f766e;
+  --status-bad: #b3261e;
 
   --danger: #b0362f;
   --danger-hover: #98241e;
@@ -171,19 +184,21 @@
 
   --text-primary: #e8eaed;
   --text-secondary: #9aa1ab;
-  --text-tertiary: #6b7280;
-  --text-on-accent: #ffffff;
+  --text-tertiary: #828996;
+  --text-on-accent: #0b0d10;
 
   --accent: #5b8cff;
   --accent-hover: #7ba0ff;
-  --accent-contrast: #ffffff;
+  --accent-contrast: #0b0d10;
 
   --score-strong: #34c77b;
   --score-developing: #e2a33d;
   --score-weak: #f0576a;
-  --score-insufficient: #6b7280;
+  --score-insufficient: #828996;
+  --status-ok: #14b8a6;
+  --status-bad: #e15e56;
 
-  --danger: #c9564e;
+  --danger: #d06b63;
   --danger-hover: #d9695f;
 
   --focus-ring: #7ba0ff;

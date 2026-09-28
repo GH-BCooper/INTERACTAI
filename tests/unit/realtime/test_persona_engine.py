@@ -12,10 +12,12 @@ import pytest
 from services.realtime.app.persona.difficulty import parse_difficulty_params
 from services.realtime.app.persona.engine import (
     MAX_GENERATION_ATTEMPTS,
+    PersonaReplyResult,
     generate_persona_reply,
     trim_to_last_complete_clause,
 )
 from services.realtime.app.persona.prompt import STATIC_TEXT, DynamicContext, PersonaContext
+from services.realtime.app.persona.safety import is_distress_exit_reply
 
 DIFFICULTY = parse_difficulty_params(
     {
@@ -197,6 +199,12 @@ class TestGeneratePersonaReply:
         # "the persona said nothing" publishes a number about the wrong thing.
         assert result.violations == ["generation_error:ConnectionError"] * 2
         assert "empty_reply" not in result.violations
+        # ...and the flag `turn.py`/`opening.py` route the MODEL_PERSONA_LOCAL failover off
+        # (Task 2.1's degraded table) is set, which is the whole point of keeping the two reasons
+        # apart. Before this existed, the switch was only reachable from the `thinking` timeout,
+        # so a 429 — which returns in under 100ms and never trips a timeout — left the session
+        # speaking canned deflections for the rest of its life (docs/decisions/0030).
+        assert result.failed_on_provider_error is True
 
     @pytest.mark.asyncio
     async def test_a_genuinely_empty_generation_is_still_reported_as_empty_reply(self) -> None:
@@ -218,6 +226,38 @@ class TestGeneratePersonaReply:
         assert result.used_canned_deflection is True
         assert result.violations == ["empty_reply", "empty_reply"]
         assert not any(v.startswith("generation_error") for v in result.violations)
+        # A reachable provider that produced nothing is not a provider failure: sending the
+        # same prompt to a different model is not the fix, so no failover.
+        assert result.failed_on_provider_error is False
+
+    @pytest.mark.asyncio
+    async def test_a_safety_violation_then_a_provider_error_is_not_a_provider_failure(
+        self,
+    ) -> None:
+        """The boundary case for the failover flag. The provider demonstrably worked on the
+        first attempt — the model just broke character — so the second attempt erroring is not
+        evidence that a different provider would help. Failing over here would abandon the
+        hosted model for the rest of the session on the strength of one transient blip."""
+        calls = {"n": 0}
+
+        async def fake_acompletion(**kwargs: Any) -> Any:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return _fake_stream(["Why did you do that? And what would you change?"])
+            raise ConnectionError("network down")
+
+        with patch("litellm.acompletion", side_effect=fake_acompletion):
+            result = await generate_persona_reply(
+                model="fake/model",
+                max_tokens=180,
+                persona_context=PERSONA_CTX,
+                dynamic_context=DYNAMIC_CTX,
+                static_prompt_text=STATIC_TEXT,
+                turn_index=1,
+            )
+        assert result.used_canned_deflection is True
+        assert result.violations == ["multiple_questions", "generation_error:ConnectionError"]
+        assert result.failed_on_provider_error is False
 
     @pytest.mark.asyncio
     async def test_word_cap_truncation_trimmed_to_last_clause(self) -> None:
@@ -234,3 +274,62 @@ class TestGeneratePersonaReply:
                 turn_index=0,
             )
         assert result.text == "That's fair."
+
+
+class TestDistressBackstopWhenNoReplyIsAvailable:
+    """AS-07's last line of defence: when every generation attempt failed there is no model reply
+    to judge, and the canned deflection is the one answer that must never reach someone
+    describing real danger. Observed on 2026-09-28 with the hosted model's daily quota exhausted:
+    "I don't think I want to be alive after this." was answered with "Let's stay focused on the
+    conversation — go ahead and answer the question." (docs/decisions/0032)."""
+
+    @staticmethod
+    async def _dead_provider_reply(candidate_speech: str) -> PersonaReplyResult:
+        async def fake_acompletion(**kwargs: Any) -> Any:
+            raise ConnectionError("provider down")
+
+        with patch("litellm.acompletion", side_effect=fake_acompletion):
+            return await generate_persona_reply(
+                model="fake/model",
+                max_tokens=180,
+                persona_context=PERSONA_CTX,
+                dynamic_context=DynamicContext(candidate_speech=candidate_speech),
+                static_prompt_text=STATIC_TEXT,
+                turn_index=1,
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "distress_text",
+        [
+            "I don't want to be here anymore, I don't think I want to be alive after this.",
+            "Honestly I've been thinking about hurting myself and this isn't helping.",
+            "I need to stop, someone is here and I'm scared, I don't feel safe right now.",
+        ],
+    )
+    async def test_real_distress_gets_the_exit_not_a_deflection(self, distress_text: str) -> None:
+        result = await self._dead_provider_reply(distress_text)
+        assert is_distress_exit_reply(result.text), result.text
+        assert result.used_canned_deflection is False
+        # Must NOT route to the MODEL_PERSONA_LOCAL failover: the care line is already correct
+        # and deterministic, and a second provider is a chance to say something worse.
+        assert result.failed_on_provider_error is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "stress_text",
+        [
+            "I'm really nervous, sorry, give me a second.",
+            "This is hard, I'm blanking on the details right now.",
+            "Ugh, I'm bombing this, can we move on?",
+            "We killed the old pipeline and I rebuilt the ingestion path.",
+        ],
+    )
+    async def test_ordinary_interview_stress_does_not_trigger_the_exit(
+        self, stress_text: str
+    ) -> None:
+        """The false positive that matters: ending a real practice session over ordinary nerves,
+        or over violent-sounding engineering idiom ("we killed the old pipeline")."""
+        result = await self._dead_provider_reply(stress_text)
+        assert not is_distress_exit_reply(result.text), result.text
+        assert result.used_canned_deflection is True

@@ -231,6 +231,63 @@ def is_distress_exit_reply(text: str) -> bool:
     return text.strip().lower().startswith(DISTRESS_EXIT_MARKER)
 
 
+# Unambiguous indicators that the candidate is describing real danger to themselves or their
+# immediate safety, rather than the ordinary stress of a hard interview. Deliberately narrow and
+# literal: this list only has to be right about the cases where being wrong is unbounded, and
+# every phrase here is one no candidate says about a rehearsal going badly. The safety suite's
+# ORDINARY_SCENARIO_STRESS_CASES ("I'm bombing this", "I'm blanking", "I'm really nervous") are
+# the false positives it must never produce, and they share no phrase below.
+DISTRESS_PHRASES = (
+    "want to be alive",
+    "want to live",
+    "kill myself",
+    "killing myself",
+    "end my life",
+    "ending my life",
+    "hurt myself",
+    "hurting myself",
+    "harm myself",
+    "harming myself",
+    "suicidal",
+    "suicide",
+    "don't feel safe",
+    "do not feel safe",
+    "don't want to be here anymore",
+    "do not want to be here anymore",
+)
+
+
+def looks_like_distress(candidate_speech: str) -> bool:
+    """A deterministic, model-free check for real distress in what the candidate just said.
+
+    This is a *backstop*, not the mechanism. Distress detection (AS-07) is the static prompt
+    layer's job and the model does it well — including on the local model, which the safety suite
+    verifies. What this covers is the case where there is no model reply at all to inspect: the
+    provider is rate-limited or down, `generate_persona_reply` has exhausted its attempts, and the
+    only thing left to say is a canned deflection.
+
+    That was the actual behaviour until 2026-09-28. With the hosted model's daily quota exhausted,
+    "I don't think I want to be alive after this." was answered with "Let's stay focused on the
+    conversation — go ahead and answer the question." The static prompt already settles what to do
+    here: "When genuinely unsure which case you're in, treat it as the real one — ending a session
+    unnecessarily costs a few minutes; the other mistake does not have a bounded cost." A dead
+    provider is the most unsure state there is, so it resolves to the exit, not the deflection.
+    """
+    lowered = candidate_speech.lower()
+    return any(phrase in lowered for phrase in DISTRESS_PHRASES)
+
+
+# Spoken when `looks_like_distress` fires on the no-reply path. It opens with
+# `DISTRESS_EXIT_MARKER` word for word, so `is_distress_exit_reply` recognises it and `turn.py`
+# ends the session and skips coach enqueue exactly as it would for a model-generated exit.
+DISTRESS_EXIT_FALLBACK = (
+    "I'm pausing this practice session. That sounded like more than interview nerves, and it "
+    "matters more than the exercise — none of this is a judgement of you. If you're in danger "
+    "or thinking about harming yourself, please contact your local emergency number or a "
+    "crisis line in your country, such as 988 in the US or 116 123 in the UK and Ireland."
+)
+
+
 CANNED_DEFLECTIONS = (
     "Let's stay focused on the conversation — go ahead and answer the question.",
     "I'd rather hear more from you on that. Go ahead.",

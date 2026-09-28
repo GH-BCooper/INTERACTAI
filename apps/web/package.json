@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "lint": "eslint . && node scripts/check-design-tokens.mjs",
+    "lint": "eslint . && node scripts/check-design-tokens.mjs && node scripts/check-contrast.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

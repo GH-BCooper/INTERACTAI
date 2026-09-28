@@ -96,13 +96,29 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     )
 
 
+def _describe_validation_errors(exc: RequestValidationError) -> str:
+    """A readable one-line summary of what was wrong with the request body.
+
+    CLAUDE.md §6 requires `message` to be human readable, and `str(exc.errors())` is not — it is
+    the repr of a list of Pydantic dicts, complete with `'loc': ('body', 'scenario_id')` tuples.
+    Any client that shows `error.message` to a person (the web app does) would be putting Python
+    internals on screen, which is the same class of mistake as a stack trace."""
+    parts: list[str] = []
+    for err in exc.errors():
+        # Drop the leading "body"/"query" frame — the field path is what identifies the problem.
+        loc = [str(p) for p in err.get("loc", ()) if p not in ("body", "query", "path")]
+        field = ".".join(loc) or "request"
+        parts.append(f"{field}: {err.get('msg', 'is invalid')}")
+    return "; ".join(parts) or "The request body is invalid."
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     return _error_response(
         request,
         status_code=422,
         code="VALIDATION_ERROR",
-        message=str(exc.errors()),
+        message=_describe_validation_errors(exc),
         recovery="Check the request body against the API schema.",
     )
 

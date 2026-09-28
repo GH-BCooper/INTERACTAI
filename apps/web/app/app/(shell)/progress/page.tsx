@@ -75,9 +75,9 @@ export default function ProgressPage() {
       {progress.weakest_dimension && (
         <div className="mt-5 flex items-start gap-3 rounded-lg border bg-[var(--bg-card)] p-4">
           {progress.weakest_dimension.trend < 0 ? (
-            <TrendingDown size={18} className="mt-0.5 shrink-0 text-[var(--score-weak)]" />
+            <TrendingDown size={18} className="mt-0.5 shrink-0 text-[var(--status-bad)]" />
           ) : (
-            <TrendingUp size={18} className="mt-0.5 shrink-0 text-[var(--score-strong)]" />
+            <TrendingUp size={18} className="mt-0.5 shrink-0 text-[var(--status-ok)]" />
           )}
           <div>
             <p className="text-sm font-medium">{progress.weakest_dimension.name} needs the most attention</p>

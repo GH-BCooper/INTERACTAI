@@ -22,7 +22,21 @@ from ..core.logging import get_logger
 logger = get_logger(__name__)
 
 TARGET_SAMPLE_RATE = 24_000
+
+# The spec'd per-chunk synthesis deadline (docs/phase-1-BUILD Task 1.5b). It is a
+# *time-to-first-audio* number: it bounds how long the user waits in silence, which is only
+# what the first chunk of a reply actually decides.
 CHUNK_DEADLINE_MS = 400.0
+
+# Every later chunk is synthesised while the previous one is still playing, so its real
+# constraint is "ready before the queued audio drains", not 400ms. Piper synthesises ~290ms of
+# speech per word at ~60ms/word (p95, measured at PIPER_INTRA_OP_THREADS — docs/decisions/0029),
+# i.e. roughly 5x faster than playback, so a per-word allowance keeps the holding line for
+# genuine engine failures instead of firing on every chunk longer than six words.
+LATER_CHUNK_MS_PER_WORD = 90.0
+
+# See `_load_voice` for the benchmark this comes from.
+PIPER_INTRA_OP_THREADS = 4
 BACKCHANNEL_PHRASES = ("mm-hm", "right", "okay", "sure")
 HOLDING_LINE_TEXT = "Sorry, one moment."
 IDLE_PROMPT_TEXT = "Whenever you're ready, go ahead."
@@ -48,23 +62,34 @@ def _load_voice(model_path: Path) -> PiperVoice:
     """Builds the same `PiperVoice` that `PiperVoice.load()` would (same config-loading and
     provider logic — see its source), except with a constrained `onnxruntime.SessionOptions`.
 
-    Measured live on this project's dev hardware: `PiperVoice.load()`'s default
-    `SessionOptions()` leaves `intra_op_num_threads` at onnxruntime's default (one per physical
-    core — 10 here), and a small VITS model like Piper's pays more in per-call thread-pool
-    wake/synchronization overhead than it gains from that parallelism. Direct A/B benchmark
-    (same model, same sentence, 6 calls each): default (10 threads) 726-916ms per call;
-    `intra_op_num_threads=1` 95-335ms per call — a 3-6x difference, and the default was the
-    entire reason the opening-line delivery (persona/opening.py) was missing its 400ms
-    `CHUNK_DEADLINE_MS` on every run despite the voice already being warm. `inter_op_num_threads`
-    is irrelevant here (the model graph has no parallel branches to schedule across) but is set
-    to 1 for the same reason. Concurrency across sessions still comes from `asyncio.to_thread`
+    `PiperVoice.load()`'s default `SessionOptions()` leaves `intra_op_num_threads` at
+    onnxruntime's default (one per physical core), and a small VITS graph like Piper's pays more
+    in per-call thread-pool wake/synchronization overhead than it gains from that parallelism —
+    see docs/decisions/0011. That finding still holds; its *chosen value* does not. Re-measured
+    at steady state (4 warm-up calls, then the median and max of 10, on an otherwise idle
+    machine — docs/decisions/0029):
+
+    | `intra_op_num_threads` | short sentence p50 / p95 | 14-word sentence p50 / p95 |
+    |---|---|---|
+    | 1 | 470 / 537 ms | 1567 / 1589 ms |
+    | 2 | 310 / 322 ms | 957 / 985 ms |
+    | 4 | **219 / 258 ms** | **717 / 767 ms** |
+    | 8 | 664 / 728 ms | 1719 / 1797 ms |
+    | default | 841 / 916 ms | 1465 / 1572 ms |
+
+    1 and the onnxruntime default sit on opposite sides of the same curve and 4 is its floor
+    here. 0011 measured only the first few calls after a voice load, which are unrepresentatively
+    fast (~110-170ms at any thread count) before the session settles — that is why it read 1 as
+    the winner. At 1, every real chunk missed the 400ms `CHUNK_DEADLINE_MS` and every persona
+    reply degraded to a holding line. `inter_op_num_threads` stays 1: the graph has no parallel
+    branches to schedule across. Concurrency across sessions still comes from `asyncio.to_thread`
     dispatching each call to its own OS thread — this only bounds each session's *internal*
     thread pool, which is the one thing `PiperVoice.load()` doesn't let a caller configure."""
     config_path = f"{model_path}.json"
     with open(config_path, encoding="utf-8") as f:
         config_dict = json.load(f)
     sess_options = onnxruntime.SessionOptions()
-    sess_options.intra_op_num_threads = 1
+    sess_options.intra_op_num_threads = PIPER_INTRA_OP_THREADS
     sess_options.inter_op_num_threads = 1
     session = onnxruntime.InferenceSession(
         str(model_path), sess_options=sess_options, providers=["CPUExecutionProvider"]
@@ -130,6 +155,18 @@ async def synthesize_chunk(
     return _resample_linear(audio, src_rate, TARGET_SAMPLE_RATE), TARGET_SAMPLE_RATE
 
 
+def deadline_for_chunk(text: str, *, is_first_chunk: bool) -> float:
+    """The synthesis deadline for one chunk, in milliseconds.
+
+    The first chunk of a reply gets the spec'd `CHUNK_DEADLINE_MS` because it is the one the
+    user waits on in silence. Later chunks are overlapped with playback of the chunks already
+    sent, so holding them to the same flat 400ms made a normal-length sentence — anything past
+    about six words — fail on every attempt and speak a holding line mid-reply."""
+    if is_first_chunk:
+        return CHUNK_DEADLINE_MS
+    return max(CHUNK_DEADLINE_MS, LATER_CHUNK_MS_PER_WORD * len(text.split()))
+
+
 SynthFn = Callable[[str, str], Awaitable["tuple[np.ndarray, int] | None"]]
 
 
@@ -151,26 +188,66 @@ async def synthesize_with_deadline(
     synth: SynthFn,
     deadline_ms: float = CHUNK_DEADLINE_MS,
 ) -> SynthesisResult:
-    """Task 1.5b: a chunk taking > deadline_ms falls back to the secondary voice; if that also
-    fails, the caller plays the pre-synthesised holding line and raises `degraded`
-    (component="tts") — this function only decides *which* audio to use, the caller does the
-    playing/raising, since those need session/websocket context this module doesn't have.
+    """Decides *which* audio to use for one chunk. The caller does the playing and the
+    `degraded` (component="tts") signalling, since those need session/websocket context this
+    module doesn't have.
 
-    Any synthesis failure — not just a timeout (a missing voice file, a corrupt model, an
-    engine crash: CLAUDE.md §6's SYNTHESIS_* class) — falls through the same path. A chunk
-    that fails outright is exactly as unplayable as one that was merely too slow."""
-    for voice_id, is_fallback in ((primary_voice_id, False), (secondary_voice_id, True)):
+    **A chunk that is too slow and a chunk that failed outright are handled differently, and
+    this is a deliberate departure from Task 1.5b's "if a chunk takes > 400 ms, fall back to the
+    secondary voice".** They read as the same thing — both leave you with no audio — but they
+    are not, because of how the timeout works. `synth` ends in `asyncio.to_thread`, and a thread
+    is not cancellable: when `wait_for` gives up, the abandoned synthesis keeps running to
+    completion, still holding its ONNX Runtime threads. Re-synthesising on the secondary voice at
+    that moment puts a second CPU-bound job against the first one, so the retry misses the same
+    deadline, and the orphan is still running when the *next* chunk starts. The failures
+    compound.
+
+    Measured (48 chunks of four realistic replies, both voices pre-warmed, real chunker splits —
+    docs/decisions/0031):
+
+    | | outcome |
+    |---|---|
+    | secondary-voice retry on timeout | 25/48 chunks missed, p50 719ms, p95 2537ms |
+    | same 48 chunks, nothing ever abandoned | p50 142ms, p95 424ms, 3/48 genuinely over 400ms |
+
+    So the retry-on-slow rule manufactured roughly eight times the failures it caught. A timeout
+    therefore goes straight to the holding line: the deadline has already been spent, a second
+    synthesis cannot beat it, and starting one only damages the chunks that follow.
+
+    An *exception* still falls back to the secondary voice, which is what a fallback voice is
+    actually for — a missing voice file, a corrupt model, an engine crash (CLAUDE.md §6's
+    SYNTHESIS_* class). Nothing is occupying the CPU in that case, so the retry is free and can
+    genuinely succeed."""
+    try:
+        result = await asyncio.wait_for(synth(primary_voice_id, text), timeout=deadline_ms / 1000)
+    except TimeoutError:
+        logger.warning(
+            "tts_chunk_missed_deadline", voice_id=primary_voice_id, deadline_ms=deadline_ms
+        )
+        return SynthesisResult(audio=None, sample_rate=TARGET_SAMPLE_RATE, used_holding_line=True)
+    except Exception:
+        logger.warning("tts_synthesis_failed", voice_id=primary_voice_id, is_fallback=False)
         try:
-            result = await asyncio.wait_for(synth(voice_id, text), timeout=deadline_ms / 1000)
+            result = await asyncio.wait_for(
+                synth(secondary_voice_id, text), timeout=deadline_ms / 1000
+            )
         except TimeoutError:
-            continue
+            return SynthesisResult(
+                audio=None, sample_rate=TARGET_SAMPLE_RATE, used_holding_line=True
+            )
         except Exception:
-            logger.warning("tts_synthesis_failed", voice_id=voice_id, is_fallback=is_fallback)
-            continue
+            logger.warning("tts_synthesis_failed", voice_id=secondary_voice_id, is_fallback=True)
+            return SynthesisResult(
+                audio=None, sample_rate=TARGET_SAMPLE_RATE, used_holding_line=True
+            )
         if result is not None:
             audio, sr = result
-            return SynthesisResult(audio=audio, sample_rate=sr, used_fallback_voice=is_fallback)
+            return SynthesisResult(audio=audio, sample_rate=sr, used_fallback_voice=True)
+        return SynthesisResult(audio=None, sample_rate=TARGET_SAMPLE_RATE, used_holding_line=True)
 
+    if result is not None:
+        audio, sr = result
+        return SynthesisResult(audio=audio, sample_rate=sr, used_fallback_voice=False)
     return SynthesisResult(audio=None, sample_rate=TARGET_SAMPLE_RATE, used_holding_line=True)
 
 
