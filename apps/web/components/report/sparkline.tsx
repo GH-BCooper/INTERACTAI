@@ -3,10 +3,19 @@
  * score colours used elsewhere on this page for rubric judgements). One series needs no legend
  * (the panel's own label names it) and no axis — this is a shape, not a plot to be read
  * precisely. Text stays in text tokens; only the line itself carries the (neutral) colour. */
-export function Sparkline({ values, height = 32 }: { values: number[]; height?: number }) {
+export function Sparkline({
+  values,
+  height = 32,
+  width = 160,
+  label,
+}: {
+  values: number[];
+  height?: number;
+  width?: number;
+  label?: string;
+}) {
   if (values.length < 2) return null;
 
-  const width = 160;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
@@ -24,7 +33,7 @@ export function Sparkline({ values, height = 32 }: { values: number[]; height?: 
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label={`Trend across ${values.length} turns, from ${min.toFixed(0)} to ${max.toFixed(0)}`}
+      aria-label={label ?? `Trend across ${values.length} turns, from ${min.toFixed(0)} to ${max.toFixed(0)}`}
       className="overflow-visible"
     >
       <polyline

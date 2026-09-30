@@ -1,16 +1,27 @@
 "use client";
 
+import { defaultFilter } from "cmdk";
+import { Search, Wand2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ScenarioCard, ScenarioCardSkeleton } from "@/components/dashboard/scenario-card";
 import { StartSessionDialog } from "@/components/dashboard/start-session-dialog";
-import { useScenarioProgress, useScenarios } from "@/lib/api/hooks";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/field";
+import { capitalize, EmptyState, PageHeader, Pill } from "@/components/ui/primitives";
+import { Segmented } from "@/components/ui/segmented";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { usePersonas, useScenarioProgress, useScenarios } from "@/lib/api/hooks";
 import type { ScenarioOut } from "@/lib/api/types";
 
 const FAMILIES = ["all", "technical", "behavioural", "negotiation", "viva"] as const;
 const DIFFICULTIES = ["all", "gentle", "standard", "hard"] as const;
 const DURATIONS = ["all", "20", "30"] as const;
+
+type Family = (typeof FAMILIES)[number];
+type DifficultyFilter = (typeof DIFFICULTIES)[number];
+type DurationFilter = (typeof DURATIONS)[number];
 
 function readParam<T extends string>(value: string | null, allowed: readonly T[], fallback: T): T {
   return value && (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
@@ -20,55 +31,55 @@ export default function ScenarioLibraryPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [family, setFamily] = useState(() =>
-    readParam(searchParams.get("family"), FAMILIES, "all"),
-  );
-  const [difficulty, setDifficulty] = useState(() =>
+  const [family, setFamily] = useState<Family>(() => readParam(searchParams.get("family"), FAMILIES, "all"));
+  const [difficulty, setDifficulty] = useState<DifficultyFilter>(() =>
     readParam(searchParams.get("difficulty"), DIFFICULTIES, "all"),
   );
-  const [duration, setDuration] = useState(() =>
-    readParam(searchParams.get("duration"), DURATIONS, "all"),
-  );
+  const [duration, setDuration] = useState<DurationFilter>(() => readParam(searchParams.get("duration"), DURATIONS, "all"));
   const [tag, setTag] = useState(searchParams.get("tag") ?? "");
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  // docs/ui-audit-2026-09.md §6: typing no longer rewrites the URL (and refetches) per keystroke.
+  const debouncedTag = useDebouncedValue(tag.trim(), 250);
+  const debouncedSearch = useDebouncedValue(search.trim(), 250);
 
-  function updateFilter(next: {
-    family?: (typeof FAMILIES)[number];
-    difficulty?: (typeof DIFFICULTIES)[number];
-    duration?: (typeof DURATIONS)[number];
-    tag?: string;
-  }) {
-    const nextFamily = next.family ?? family;
-    const nextDifficulty = next.difficulty ?? difficulty;
-    const nextDuration = next.duration ?? duration;
-    const nextTag = next.tag ?? tag;
-    if (next.family !== undefined) setFamily(next.family);
-    if (next.difficulty !== undefined) setDifficulty(next.difficulty);
-    if (next.duration !== undefined) setDuration(next.duration);
-    if (next.tag !== undefined) setTag(next.tag);
-
+  useEffect(() => {
     const params = new URLSearchParams();
-    if (nextFamily !== "all") params.set("family", nextFamily);
-    if (nextDifficulty !== "all") params.set("difficulty", nextDifficulty);
-    if (nextDuration !== "all") params.set("duration", nextDuration);
-    if (nextTag.trim()) params.set("tag", nextTag.trim());
+    if (family !== "all") params.set("family", family);
+    if (difficulty !== "all") params.set("difficulty", difficulty);
+    if (duration !== "all") params.set("duration", duration);
+    if (debouncedTag) params.set("tag", debouncedTag);
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    const scenario = searchParams.get("scenario");
+    if (scenario) params.set("scenario", scenario);
     const qs = params.toString();
-    router.replace(qs ? `/app/scenarios?${qs}` : "/app/scenarios");
-  }
+    if (qs !== searchParams.toString()) router.replace(qs ? `/app/scenarios?${qs}` : "/app/scenarios", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- URL mirrors the filters, not the reverse
+  }, [family, difficulty, duration, debouncedTag, debouncedSearch]);
 
   const { data: scenarios, isPending } = useScenarios({
     family: family === "all" ? undefined : family,
     difficulty: difficulty === "all" ? undefined : difficulty,
     duration: duration === "all" ? undefined : Number(duration),
-    tag: tag.trim() || undefined,
+    tag: debouncedTag || undefined,
   });
   const { data: scenarioProgress } = useScenarioProgress();
+  const { data: personas } = usePersonas();
+
+  // Same fuzzy scorer the command palette uses (cmdk's), so "sys des" finds the same things in
+  // both places. Best matches first.
+  const visible = useMemo(() => {
+    if (!scenarios) return undefined;
+    if (!debouncedSearch) return scenarios;
+    return scenarios
+      .map((s) => ({ s, score: defaultFilter(`${s.title} ${s.brief} ${s.tags.join(" ")}`, debouncedSearch) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.s);
+  }, [scenarios, debouncedSearch]);
 
   const preselectedId = searchParams.get("scenario");
   const [manualSelection, setManualSelection] = useState<ScenarioOut | null>(null);
-  const preselected = useMemo(
-    () => scenarios?.find((s) => s.id === preselectedId) ?? null,
-    [scenarios, preselectedId],
-  );
+  const preselected = useMemo(() => scenarios?.find((s) => s.id === preselectedId) ?? null, [scenarios, preselectedId]);
   const dialogScenario = manualSelection ?? preselected;
 
   function closeDialog() {
@@ -77,104 +88,117 @@ export default function ScenarioLibraryPage() {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("scenario");
       const qs = params.toString();
-      router.replace(qs ? `/app/scenarios?${qs}` : "/app/scenarios");
+      router.replace(qs ? `/app/scenarios?${qs}` : "/app/scenarios", { scroll: false });
     }
   }
 
+  const filtersActive = family !== "all" || difficulty !== "all" || duration !== "all" || tag !== "" || search !== "";
+
+  function clearFilters() {
+    setFamily("all");
+    setDifficulty("all");
+    setDuration("all");
+    setTag("");
+    setSearch("");
+  }
+
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
-      <h1 className="text-lg font-medium">Scenario library</h1>
-      <p className="mt-1 text-sm text-[var(--text-secondary)]">
-        Pick a scenario. You choose the difficulty and length when you start.
-      </p>
+    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <PageHeader title="Scenario library" description="Pick a scenario. You choose the difficulty and length when you start." />
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <div className="flex gap-2" role="tablist" aria-label="Filter by scenario family">
-          {FAMILIES.map((f) => (
-            <button
-              key={f}
-              type="button"
-              role="tab"
-              aria-selected={family === f}
-              onClick={() => updateFilter({ family: f })}
-              className={`rounded-full border px-3 py-1 text-xs capitalize transition-colors ${
-                family === f
-                  ? "bg-[var(--accent)] text-[var(--text-on-accent)]"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+      <div className="mt-6 flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+            <Input
+              aria-label="Search scenarios"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search scenarios…"
+              className="pl-9"
+            />
+          </div>
+          <Input
+            aria-label="Filter by tag"
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+            placeholder="Filter by tag…"
+            className="sm:w-48"
+          />
         </div>
-
-        <select
-          aria-label="Filter by difficulty"
-          value={difficulty}
-          onChange={(e) =>
-            updateFilter({ difficulty: e.target.value as (typeof DIFFICULTIES)[number] })
-          }
-          className="rounded-md border bg-[var(--bg-card)] px-2 py-1.5 text-xs capitalize"
-        >
-          {DIFFICULTIES.map((d) => (
-            <option key={d} value={d}>
-              {d === "all" ? "Any difficulty" : d}
-            </option>
-          ))}
-        </select>
-
-        <select
-          aria-label="Filter by duration"
-          value={duration}
-          onChange={(e) => updateFilter({ duration: e.target.value as (typeof DURATIONS)[number] })}
-          className="rounded-md border bg-[var(--bg-card)] px-2 py-1.5 text-xs"
-        >
-          {DURATIONS.map((d) => (
-            <option key={d} value={d}>
-              {d === "all" ? "Any duration" : `${d} min`}
-            </option>
-          ))}
-        </select>
-
-        <input
-          aria-label="Filter by tag"
-          value={tag}
-          onChange={(e) => updateFilter({ tag: e.target.value })}
-          placeholder="Filter by tag…"
-          className="w-40 rounded-md border bg-[var(--bg-card)] px-2 py-1.5 text-xs placeholder:text-[var(--text-tertiary)]"
-        />
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <Segmented
+            label="Filter by scenario family"
+            value={family}
+            onChange={setFamily}
+            options={FAMILIES.map((f) => ({ value: f, label: f === "all" ? "All families" : capitalize(f) }))}
+          />
+          <Segmented
+            label="Filter by difficulty"
+            value={difficulty}
+            onChange={setDifficulty}
+            options={DIFFICULTIES.map((d) => ({ value: d, label: d === "all" ? "Any difficulty" : capitalize(d) }))}
+          />
+          <Segmented
+            label="Filter by duration"
+            value={duration}
+            onChange={setDuration}
+            options={DURATIONS.map((d) => ({ value: d, label: d === "all" ? "Any length" : `${d} min` }))}
+          />
+          {filtersActive && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <X size={14} aria-hidden /> Clear
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {isPending && Array.from({ length: 6 }).map((_, i) => <ScenarioCardSkeleton key={i} />)}
-        {!isPending && scenarios?.length === 0 && (
-          <div className="col-span-full rounded-lg border border-dashed p-6 text-center">
-            <p className="text-sm text-[var(--text-secondary)]">
-              No scenarios match these filters — try widening them.
-            </p>
+        {!isPending && visible?.length === 0 && (
+          <EmptyState
+            className="col-span-full"
+            compact
+            title="No scenarios match"
+            body="Try widening the filters or a different search."
+            action={
+              <Button variant="secondary" size="sm" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            }
+          />
+        )}
+        {!isPending && visible && visible.length > 0 && (
+          <>
+            {visible.map((s) => (
+              <div key={s.id} className="animate-rise-in">
+                <ScenarioCard
+                  scenario={s}
+                  persona={personas?.find((p) => p.id === s.persona_id) ?? null}
+                  bestScore={scenarioProgress?.[s.id]?.best_score ?? null}
+                  onStart={() => setManualSelection(s)}
+                />
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* docs/ui-audit-2026-09.md §6: authoring isn't built (POST /scenarios is 501), so this is
+            shown as clearly unavailable rather than as a link to a dead end. */}
+        {!isPending && !filtersActive && (
+          <div
+            aria-disabled="true"
+            className="flex flex-col items-start justify-center gap-1 rounded-lg border border-dashed p-4 text-left text-[var(--text-tertiary)]"
+          >
+            <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
+              <Wand2 size={14} aria-hidden /> Custom scenario <Pill tone="outline">Soon</Pill>
+            </span>
+            <span className="text-xs">Author your own brief, persona and rubric.</span>
           </div>
         )}
-        {scenarios?.map((s) => (
-          <ScenarioCard
-            key={s.id}
-            scenario={s}
-            bestScore={scenarioProgress?.[s.id]?.best_score ?? null}
-            onStart={() => setManualSelection(s)}
-          />
-        ))}
-
-        {!isPending && (
-          <a
-            href="/app/scenarios/custom"
-            className="flex flex-col items-start justify-center gap-1 rounded-lg border border-dashed bg-[var(--bg-card)] p-4 text-left text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-raised)] hover:text-[var(--text-primary)]"
-          >
-            <span className="text-sm font-medium">Custom scenario</span>
-            <span className="text-xs">Author your own — coming soon</span>
-          </a>
-        )}
       </div>
 
-      {dialogScenario && <StartSessionDialog scenario={dialogScenario} onClose={closeDialog} />}
+      {dialogScenario && <StartSessionDialog key={dialogScenario.id} scenario={dialogScenario} onClose={closeDialog} />}
     </div>
   );
 }

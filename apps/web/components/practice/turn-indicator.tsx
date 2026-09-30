@@ -32,7 +32,7 @@ export function TurnIndicator({ clientState }: { clientState: ClientState }) {
       className={clsx(
         "flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium",
         clientState === "your_turn" && "border-[var(--accent)] text-[var(--accent)]",
-        clientState === "connection_trouble" && "border-[var(--danger)] text-[var(--danger)]",
+        clientState === "connection_trouble" && "border-[var(--status-bad)] text-[var(--status-bad)]",
       )}
     >
       <Icon size={16} className={clientState === "thinking" ? "animate-thinking" : undefined} />

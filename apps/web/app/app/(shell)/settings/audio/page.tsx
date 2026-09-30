@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 
 import { AudioCheckPanel } from "@/components/settings/audio-check-panel";
+import { SaveStatus } from "@/components/settings/save-status";
 import { Button } from "@/components/ui/button";
+import { FieldHint, Label, Select } from "@/components/ui/field";
+import { Card } from "@/components/ui/primitives";
+import { Switch } from "@/components/ui/switch";
 import { useMe, useUpdateProfile } from "@/lib/api/hooks";
 import {
   getSavedInputDeviceId,
@@ -46,7 +50,7 @@ export default function AudioSettingsPage() {
   const [speakingRate, setSpeakingRate] = useState(1.0);
   const [echoCancellation, setEchoCancellation] = useState(true);
   const [noiseSuppression, setNoiseSuppression] = useState(true);
-  const [saved, setSaved] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     setInputDeviceId(getSavedInputDeviceId() ?? "");
@@ -63,85 +67,65 @@ export default function AudioSettingsPage() {
   }, [me]);
 
   async function save() {
-    setSaved(false);
     setSavedInputDeviceId(inputDeviceId);
     setSavedOutputDeviceId(outputDeviceId);
-    await updateProfile.mutateAsync({
-      captions_default: captionsDefault,
-      speaking_rate: speakingRate,
-      echo_cancellation: echoCancellation,
-      noise_suppression: noiseSuppression,
-    });
-    setSaved(true);
+    try {
+      await updateProfile.mutateAsync({
+        captions_default: captionsDefault,
+        speaking_rate: speakingRate,
+        echo_cancellation: echoCancellation,
+        noise_suppression: noiseSuppression,
+      });
+      setSavedAt(Date.now());
+    } catch {
+      // SaveStatus shows it.
+    }
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <label className="block text-xs text-[var(--text-secondary)]" htmlFor="input-device">
-          Microphone
-        </label>
-        <select
-          id="input-device"
-          value={inputDeviceId}
-          onChange={(e) => setInputDeviceId(e.target.value)}
-          className="mt-1 w-full rounded-md border bg-[var(--bg-card)] px-3 py-2 text-sm"
-        >
+        <Label htmlFor="input-device">Microphone</Label>
+        <Select id="input-device" className="mt-1" value={inputDeviceId} onChange={(e) => setInputDeviceId(e.target.value)}>
           <option value="">System default</option>
           {inputDevices.map((d) => (
             <option key={d.deviceId} value={d.deviceId}>
               {d.label || `Microphone ${d.deviceId.slice(0, 6)}`}
             </option>
           ))}
-        </select>
+        </Select>
 
-        <label className="mt-4 block text-xs text-[var(--text-secondary)]" htmlFor="output-device">
+        <Label htmlFor="output-device" className="mt-4">
           Speaker
-        </label>
-        <select
-          id="output-device"
-          value={outputDeviceId}
-          onChange={(e) => setOutputDeviceId(e.target.value)}
-          className="mt-1 w-full rounded-md border bg-[var(--bg-card)] px-3 py-2 text-sm"
-        >
+        </Label>
+        <Select id="output-device" className="mt-1" value={outputDeviceId} onChange={(e) => setOutputDeviceId(e.target.value)}>
           <option value="">System default</option>
           {outputDevices.map((d) => (
             <option key={d.deviceId} value={d.deviceId}>
               {d.label || `Speaker ${d.deviceId.slice(0, 6)}`}
             </option>
           ))}
-        </select>
+        </Select>
         {inputDevices.length === 0 && (
-          <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-            Device names appear once you&apos;ve granted microphone access at least once.
-          </p>
+          <FieldHint>Device names appear once you&apos;ve granted microphone access at least once.</FieldHint>
         )}
       </div>
 
-      <label className="flex items-center justify-between text-sm">
-        Echo cancellation
-        <input
-          type="checkbox"
+      <Card className="flex flex-col gap-4 p-4">
+        <Switch
+          label="Echo cancellation"
+          description="Stops the interviewer's voice from your speakers being picked up as you."
           checked={echoCancellation}
-          onChange={(e) => setEchoCancellation(e.target.checked)}
+          onChange={setEchoCancellation}
         />
-      </label>
-      <label className="flex items-center justify-between text-sm">
-        Noise suppression
-        <input
-          type="checkbox"
+        <Switch
+          label="Noise suppression"
+          description="Filters steady background noise such as fans."
           checked={noiseSuppression}
-          onChange={(e) => setNoiseSuppression(e.target.checked)}
+          onChange={setNoiseSuppression}
         />
-      </label>
-      <label className="flex items-center justify-between text-sm">
-        Show captions by default
-        <input
-          type="checkbox"
-          checked={captionsDefault}
-          onChange={(e) => setCaptionsDefault(e.target.checked)}
-        />
-      </label>
+        <Switch label="Show captions by default" checked={captionsDefault} onChange={setCaptionsDefault} />
+      </Card>
 
       <div>
         <label className="flex items-center justify-between text-xs text-[var(--text-secondary)]" htmlFor="speaking-rate">
@@ -156,15 +140,19 @@ export default function AudioSettingsPage() {
           step={0.05}
           value={speakingRate}
           onChange={(e) => setSpeakingRate(Number(e.target.value))}
-          className="mt-2 w-full"
+          className="mt-2 w-full accent-[var(--accent)]"
         />
       </div>
 
       <div className="flex items-center gap-3">
         <Button variant="primary" onClick={() => void save()} disabled={updateProfile.isPending}>
-          {updateProfile.isPending ? "Saving…" : "Save"}
+          Save changes
         </Button>
-        {saved && <span className="text-xs text-[var(--text-tertiary)]">Saved.</span>}
+        <SaveStatus
+          pending={updateProfile.isPending}
+          savedAt={savedAt}
+          error={updateProfile.error ? "Couldn't save. Try again." : null}
+        />
       </div>
 
       <AudioCheckPanel constraints={{ deviceId: inputDeviceId || undefined, echoCancellation, noiseSuppression }} />

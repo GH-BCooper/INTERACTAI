@@ -1,5 +1,6 @@
 "use client";
 
+import { FileQuestion, Mic } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -16,16 +17,42 @@ import {
 import { useReportWaveform } from "@/hooks/use-report-waveform";
 import { PersonaAudioCache } from "@/lib/report/persona-audio-cache";
 import { usePlayerStore } from "@/stores/player-store";
+import { ButtonLink } from "@/components/ui/button";
+import { EmptyState, Skeleton } from "@/components/ui/primitives";
 
 import { DeliveryPanel } from "./delivery-panel";
 import { ReportHeader } from "./report-header";
 import { ScorePanel } from "./score-panel";
 import { Transcript } from "./transcript";
-import { VerdictBlock } from "./verdict-block";
+import { ScoringInProgress, VerdictBlock } from "./verdict-block";
 import { Waveform } from "./waveform";
 
 function SkeletonBlock({ heightClass }: { heightClass: string }) {
-  return <div className={`animate-pulse rounded-lg border bg-[var(--bg-card)] ${heightClass}`} />;
+  return <Skeleton className={`w-full rounded-lg ${heightClass}`} />;
+}
+
+const SECTIONS = [
+  { id: "verdict", label: "Verdict" },
+  { id: "scores", label: "Scores" },
+  { id: "delivery", label: "Delivery" },
+  { id: "transcript", label: "Transcript" },
+];
+
+/** docs/ui-audit-2026-09.md §9: jump links, kept in the sticky player bar. */
+function SectionNav() {
+  return (
+    <nav aria-label="Report sections" className="flex gap-1 overflow-x-auto text-xs">
+      {SECTIONS.map((s) => (
+        <a
+          key={s.id}
+          href={`#${s.id}`}
+          className="whitespace-nowrap rounded-full px-2.5 py-1 text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-raised)] hover:text-[var(--text-primary)]"
+        >
+          {s.label}
+        </a>
+      ))}
+    </nav>
+  );
 }
 
 /** Task 3.3/3.4 — the report's client half. app/app/(shell)/sessions/[id]/page.tsx is the thin
@@ -39,10 +66,20 @@ export function ReportView({ sessionId }: { sessionId: string }) {
   const { data: session, error: sessionError } = useSession(sessionId);
   const { data: scenario } = useScenario(session?.scenario_id);
   const { data: personas } = usePersonas();
-  const { data: report } = useSessionReport(sessionId, { pollWhilePending: true });
-  const { data: turns } = useSessionTurns(sessionId);
-  const { data: scores } = useSessionScores(sessionId);
-  const { data: recording } = useSessionRecording(sessionId);
+  const sessionEnded = session?.status === "closing" || session?.status === "closed";
+  const { data: report, error: reportError } = useSessionReport(sessionId, {
+    pollWhilePending: true,
+    enabled: sessionEnded,
+  });
+  // A 404 on the report means "the coach hasn't written it yet" (hooks.ts keeps retrying it).
+  const reportPending =
+    (reportError instanceof ApiError && reportError.status === 404) ||
+    (report === undefined && sessionEnded);
+  // Only once the session itself has loaded: for an unknown id these would each 404 too.
+  const loadedId = session ? sessionId : undefined;
+  const { data: turns } = useSessionTurns(loadedId);
+  const { data: scores } = useSessionScores(loadedId);
+  const { data: recording } = useSessionRecording(loadedId);
 
   const playheadMs = usePlayerStore((s) => s.playheadMs);
   const setPlayheadMs = usePlayerStore((s) => s.setPlayheadMs);
@@ -85,6 +122,7 @@ export function ReportView({ sessionId }: { sessionId: string }) {
   }, [waveform.isReady]);
 
   useEffect(() => {
+    if (sessionError) return; // nothing to deep-link into
     const timer = setTimeout(() => {
       const params = new URLSearchParams();
       const turn = (turns ?? []).find((t) => playheadMs >= t.start_ms && playheadMs < t.end_ms);
@@ -94,13 +132,43 @@ export function ReportView({ sessionId }: { sessionId: string }) {
       router.replace(`?${params.toString()}`, { scroll: false });
     }, 300);
     return () => clearTimeout(timer);
-  }, [playheadMs, activeCriterion, turns, router]);
+  }, [playheadMs, activeCriterion, turns, router, sessionError]);
 
   const [audioCache] = useState(() => new PersonaAudioCache(sessionId));
   useEffect(() => () => audioCache.dispose(), [audioCache]);
 
   if (sessionError instanceof ApiError && (sessionError.status === 404 || sessionError.status === 403)) {
-    return <div className="p-8 text-center text-sm text-[var(--text-secondary)]">Report not found.</div>;
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 sm:px-6">
+        <EmptyState
+          icon={<FileQuestion size={18} />}
+          title="We couldn't find this report"
+          body="It may have been deleted, or it belongs to a different account."
+          action={
+            <ButtonLink href="/app/sessions" variant="primary" size="sm">
+              Go to session history
+            </ButtonLink>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (session && (session.status === "created" || session.status === "active")) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 sm:px-6">
+        <EmptyState
+          icon={<Mic size={18} />}
+          title="This session hasn't finished yet"
+          body="The report is written once the session ends. Pick up where you left off, or end it from the practice room."
+          action={
+            <ButtonLink href={`/app/practice/${session.id}`} variant="primary" size="sm">
+              Continue the session
+            </ButtonLink>
+          }
+        />
+      </div>
+    );
   }
 
   const annotatableCriteria = (scores ?? [])
@@ -108,38 +176,49 @@ export function ReportView({ sessionId }: { sessionId: string }) {
     .map((s) => ({ key: s.criterion_key, name: s.name, anchor_descriptors: s.anchor_descriptors }));
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-8">
+    <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-8 sm:px-6">
       {session ? (
         <ReportHeader session={session} scenario={scenario} scores={scores ?? []} />
       ) : (
         <SkeletonBlock heightClass="h-24" />
       )}
 
-      {turns ? (
-        <Waveform
-          containerRef={containerRef}
-          waveform={waveform}
-          url={recording?.url ?? null}
-          peaks={recording?.peaks ?? null}
-          durationMs={recording?.duration_ms ?? session?.duration_ms ?? null}
-          turns={turns}
-          lowlightTurnId={report?.lowlight_turn_id ?? null}
-        />
-      ) : (
-        <SkeletonBlock heightClass="h-24" />
-      )}
+      {/* Sticky mini-player (docs/ui-audit-2026-09.md §9): the waveform controls and the section
+          jump links stay reachable while reading the transcript. The shell's `main` scrolls. */}
+      <div className="z-20 -mx-4 border-b bg-[var(--bg-page)]/95 px-4 pb-3 pt-2 backdrop-blur sm:sticky sm:top-0 sm:-mx-6 sm:px-6">
+        {turns ? (
+          <Waveform
+            containerRef={containerRef}
+            waveform={waveform}
+            url={recording?.url ?? null}
+            peaks={recording?.peaks ?? null}
+            durationMs={recording?.duration_ms ?? session?.duration_ms ?? null}
+            turns={turns}
+            lowlightTurnId={report?.lowlight_turn_id ?? null}
+          />
+        ) : (
+          <SkeletonBlock heightClass="h-24" />
+        )}
+        <div className="mt-2">
+          <SectionNav />
+        </div>
+      </div>
 
-      {report ? (
-        <VerdictBlock
-          report={report}
-          onSeekMs={waveform.seekToMs}
-          turnStartMs={(turnId) => (turns ?? []).find((t) => t.id === turnId)?.start_ms ?? null}
-        />
-      ) : (
-        <SkeletonBlock heightClass="h-32" />
-      )}
+      <section id="verdict" aria-label="Verdict" className="scroll-mt-48">
+        {report ? (
+          <VerdictBlock
+            report={report}
+            onSeekMs={waveform.seekToMs}
+            turnStartMs={(turnId) => (turns ?? []).find((t) => t.id === turnId)?.start_ms ?? null}
+          />
+        ) : reportPending ? (
+          <ScoringInProgress />
+        ) : (
+          <SkeletonBlock heightClass="h-32" />
+        )}
+      </section>
 
-      <section>
+      <section id="scores" className="scroll-mt-48">
         <h2 className="text-md font-medium">Scores</h2>
         <div className="mt-3">
           {scores ? (
@@ -155,7 +234,7 @@ export function ReportView({ sessionId }: { sessionId: string }) {
         </div>
       </section>
 
-      <section>
+      <section id="delivery" className="scroll-mt-48">
         <h2 className="text-md font-medium">Delivery</h2>
         <p className="mt-1 text-xs text-[var(--text-tertiary)]">
           Deterministic, from the transcript and timestamps — not a model judgement.
@@ -169,7 +248,7 @@ export function ReportView({ sessionId }: { sessionId: string }) {
         </div>
       </section>
 
-      <section>
+      <section id="transcript" className="scroll-mt-48">
         <h2 className="text-md font-medium">Transcript</h2>
         <div className="mt-3">
           {turns ? (

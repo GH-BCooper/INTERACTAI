@@ -30,6 +30,8 @@ import type {
   RubricOut,
   ScenarioOut,
   ScenarioProgressOut,
+  SessionExportOut,
+  SessionListItemOut,
   SessionOut,
   SessionScoreOut,
   StageRow,
@@ -119,15 +121,26 @@ export interface CreateSessionBody {
   training_consent?: boolean;
 }
 
+export interface SessionListParams {
+  limit?: number;
+  offset?: number;
+  family?: string;
+  q?: string;
+}
+
 export const sessions = {
   create: (body: CreateSessionBody) => apiFetch<SessionOut>("/sessions", { method: "POST", body }),
-  list: (params?: { limit?: number; offset?: number }) => {
+  list: (params?: SessionListParams) => {
     const qs = new URLSearchParams();
     if (params?.limit) qs.set("limit", String(params.limit));
     if (params?.offset) qs.set("offset", String(params.offset));
+    if (params?.family) qs.set("family", params.family);
+    if (params?.q) qs.set("q", params.q);
     const s = qs.toString();
-    return apiFetch<Page<SessionOut>>(`/sessions${s ? `?${s}` : ""}`);
+    return apiFetch<Page<SessionListItemOut>>(`/sessions${s ? `?${s}` : ""}`);
   },
+  deleteRecording: (id: string) => apiFetch<void>(`/sessions/${id}/recording`, { method: "DELETE" }),
+  export: (id: string) => apiFetch<SessionExportOut>(`/sessions/${id}/export`),
   get: (id: string) => apiFetch<SessionOut>(`/sessions/${id}`),
   mintWsToken: (id: string) => apiFetch<WsTokenOut>(`/sessions/${id}/ws-token`, { method: "POST" }),
   mintReplayToken: (id: string) =>

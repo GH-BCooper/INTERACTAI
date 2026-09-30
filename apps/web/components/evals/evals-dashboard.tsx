@@ -4,6 +4,7 @@ import { clsx } from "clsx";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { AdminForbidden, AdminPageHeader, WindowSelect } from "@/components/admin/admin-chrome";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api/client";
 import {
@@ -368,30 +369,39 @@ function SpeechPanel() {
   );
 }
 
+/** Runs and deployment markers inside the chosen window — filtered client-side on each row's own
+ * `created_at`, so the window never invents or drops anything the API returned. */
+function withinWindow(data: RegressionOut, days: number): RegressionOut {
+  const cutoff = Date.now() - days * 24 * 3600 * 1000;
+  return {
+    runs: data.runs.filter((r) => Date.parse(r.created_at) >= cutoff),
+    deployments: data.deployments.filter((d) => Date.parse(d.created_at) >= cutoff),
+  };
+}
+
 export function EvalsDashboard() {
   const regression = useRegression();
-  if (regression.error instanceof ApiError && regression.error.status === 403) {
-    return <div className="p-8 text-center text-sm text-[var(--text-secondary)]">Admins only.</div>;
-  }
+  const [days, setDays] = useState(90);
+  const windowed = useMemo(() => (regression.data ? withinWindow(regression.data, days) : undefined), [regression.data, days]);
+  if (regression.error instanceof ApiError && regression.error.status === 403) return <AdminForbidden />;
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
-      <div>
-        <h1 className="text-lg font-medium">Evaluations</h1>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">
-          Every number here is an eval_runs row with its dataset revision. Scores measure performance against the authored rubric — they do not predict hiring outcomes.
-        </p>
-      </div>
+    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
+      <AdminPageHeader
+        title="Evaluations"
+        description="Every number here is an eval_runs row with its dataset revision. Scores measure performance against the authored rubric — they do not predict hiring outcomes. The window applies to suite results and the regression chart."
+        filters={<WindowSelect value={days} onChange={setDays} />}
+      />
       <Section title="Model registry" subtitle="Promotion and rollback are status changes, with confirmation.">
         <Registry />
       </Section>
       <Section title="Suite results" subtitle="Agreement, error, calibration and cost per configuration.">
-        {regression.data ? <SuiteResults runs={regression.data.runs} /> : <div className="h-24 animate-pulse rounded bg-[var(--bg-raised)]" />}
+        {windowed ? <SuiteResults runs={windowed.runs} /> : <div className="h-24 animate-pulse rounded bg-[var(--bg-raised)]" />}
       </Section>
       <Section title="Per-case grid" subtitle="Each row links to the turn in its report, with the human label(s) beside the model score. Sorted by disagreement, largest first.">
         <CaseGrid />
       </Section>
       <Section title="Regression chart" subtitle="Metrics across model and prompt versions over time, with deployment markers.">
-        {regression.data ? <RegressionChart data={regression.data} /> : <div className="h-40 animate-pulse rounded bg-[var(--bg-raised)]" />}
+        {windowed ? <RegressionChart data={windowed} /> : <div className="h-40 animate-pulse rounded bg-[var(--bg-raised)]" />}
       </Section>
       <Section title="Comparison" subtitle="Two versions over identical cases; disagreements first.">
         <Comparison />

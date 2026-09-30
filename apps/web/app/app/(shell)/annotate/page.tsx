@@ -1,8 +1,13 @@
 "use client";
 
+import { ClipboardCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { AdminForbidden, AdminPageHeader } from "@/components/admin/admin-chrome";
 import { Button } from "@/components/ui/button";
+import { Label, Textarea } from "@/components/ui/field";
+import { EmptyState, Skeleton } from "@/components/ui/primitives";
+import { Switch } from "@/components/ui/switch";
 import { ApiError } from "@/lib/api/client";
 import {
   useAdminAnnotationProgress,
@@ -85,30 +90,71 @@ export default function AnnotatePage() {
     }
   }
 
-  if (queueQuery.error instanceof ApiError && queueQuery.error.code === "FORBIDDEN") {
-    return (
-      <div className="mx-auto max-w-md px-6 py-24 text-center">
-        <h1 className="text-lg font-medium">Admin access required</h1>
-        <p className="mt-2 text-sm text-[var(--text-secondary)]">
-          This tool is restricted to admin accounts (docs/decisions/0019).
-        </p>
-      </div>
-    );
-  }
+  // docs/ui-audit-2026-09.md §12: keyboard-first — 1–5 score the current item, J/K move between
+  // items. Ignored while typing in the notes field, so "1" in a note is just a "1".
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (/^[1-5]$/.test(e.key)) {
+        e.preventDefault();
+        void saveRef.current(Number(e.key));
+      } else if (e.key === "j" || e.key === "J") {
+        e.preventDefault();
+        setIndex((i) => Math.min(i + 1, Math.max(0, items.length - 1)));
+      } else if (e.key === "k" || e.key === "K") {
+        e.preventDefault();
+        setIndex((i) => Math.max(0, i - 1));
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [items.length]);
+
+  if (queueQuery.error instanceof ApiError && queueQuery.error.code === "FORBIDDEN") return <AdminForbidden />;
+
+  const progress = progressQuery.data;
+  const roundPct =
+    progress && progress.total_candidate_pairs > 0 ? Math.min(100, (progress.labeled_pairs / progress.total_candidate_pairs) * 100) : 0;
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-medium">Annotate</h1>
-        <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
+    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <AdminPageHeader
+        title="Annotate"
+        description="Score each answer against the anchor descriptors. Keys: 1–5 to score, J / K for next / previous."
+        filters={
+          <Switch
+            label="Show pre-labels"
+            description="Training split only. A suggestion to review, never auto-accepted."
             checked={preLabelledMode}
-            onChange={(e) => setPreLabelledMode(e.target.checked)}
+            onChange={setPreLabelledMode}
           />
-          Show pre-labels (training split only)
-        </label>
-      </div>
+        }
+      />
+
+      {progress && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)]">
+            <span>Round progress</span>
+            <span className="font-mono">
+              {progress.labeled_pairs} / {progress.total_candidate_pairs}
+            </span>
+          </div>
+          <div
+            className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--bg-raised)]"
+            role="progressbar"
+            aria-label="Labelled pairs this round"
+            aria-valuemin={0}
+            aria-valuemax={progress.total_candidate_pairs}
+            aria-valuenow={progress.labeled_pairs}
+          >
+            <div className="h-full rounded-full bg-[var(--accent)] transition-[width] duration-150" style={{ width: `${roundPct}%` }} />
+          </div>
+        </div>
+      )}
 
       {progressQuery.data && (
         <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg border bg-[var(--bg-card)] p-3 text-xs sm:grid-cols-4">
@@ -134,13 +180,19 @@ export default function AnnotatePage() {
       )}
 
       {queueQuery.isPending ? (
-        <div className="mt-8 h-64 animate-pulse rounded-lg border bg-[var(--bg-card)]" />
+        <Skeleton className="mt-8 h-64 rounded-lg" />
       ) : !current ? (
-        <div className="mt-8 rounded-lg border bg-[var(--bg-card)] px-6 py-16 text-center text-sm text-[var(--text-secondary)]">
-          Nothing left in your queue right now. Either everything has been labelled, or no
-          dataset revision exists yet — run{" "}
-          <code className="rounded bg-[var(--bg-raised)] px-1">dataset/build.py</code> first.
-        </div>
+        <EmptyState
+          className="mt-8"
+          icon={<ClipboardCheck size={18} />}
+          title="Nothing left in your queue"
+          body={
+            <>
+              Either everything has been labelled, or no dataset revision exists yet — run{" "}
+              <code className="rounded bg-[var(--bg-raised)] px-1 font-mono">dataset/build.py</code> first.
+            </>
+          }
+        />
       ) : (
         <div className="mt-6 rounded-lg border bg-[var(--bg-card)] p-5">
           <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)]">
@@ -184,18 +236,19 @@ export default function AnnotatePage() {
                 type="button"
                 onClick={() => void save(Number(point))}
                 disabled={submit.isPending}
-                className="rounded-md border px-3 py-2 text-left text-sm hover:bg-[var(--bg-raised)]"
+                aria-keyshortcuts={point}
+                className="flex items-start gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors duration-150 hover:bg-[var(--bg-raised)] disabled:opacity-50"
               >
-                <span className="font-mono font-medium">{point}</span> —{" "}
-                {current.anchor_descriptors[point] ?? ""}
+                <kbd className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border font-mono text-xs">{point}</kbd>
+                <span>{current.anchor_descriptors[point] ?? ""}</span>
               </button>
             ))}
           </div>
 
-          <label className="mt-3 block text-xs text-[var(--text-secondary)]" htmlFor="notes">
+          <Label htmlFor="notes" className="mt-3">
             Notes (required for extremes — 1 or 5)
-          </label>
-          <textarea
+          </Label>
+          <Textarea
             id="notes"
             value={notes}
             onChange={(e) => {
@@ -203,10 +256,10 @@ export default function AnnotatePage() {
               if (e.target.value.trim()) setExtremeNotesError(false);
             }}
             rows={2}
-            className="mt-1 w-full rounded-md border bg-[var(--bg-page)] px-2 py-1.5 text-xs"
+            className="mt-1"
           />
           {extremeNotesError && (
-            <p className="mt-1 text-xs text-[var(--danger)]">
+            <p role="alert" className="mt-1 text-xs text-[var(--status-bad)]">
               A note is required for a score of 1 or 5 — justify the extreme before saving.
             </p>
           )}
@@ -217,12 +270,16 @@ export default function AnnotatePage() {
             </p>
           )}
 
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex justify-between">
+            <Button variant="ghost" size="sm" onClick={() => setIndex((i) => Math.max(0, i - 1))} disabled={index === 0} title="Previous (K)">
+              Previous
+            </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIndex((i) => Math.min(i + 1, items.length - 1))}
               disabled={index + 1 >= items.length}
+              title="Skip (J)"
             >
               Skip for now
             </Button>

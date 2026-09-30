@@ -29,16 +29,11 @@ export default function AuthCallbackPage() {
     router.replace("/app");
   }, [router, setToken]);
 
-  if (error) {
-    return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
-        <p className="text-sm font-medium">Sign-in didn&apos;t complete.</p>
-        <a href="/signin" className="text-sm text-[var(--accent)] hover:text-[var(--accent-hover)]">
-          Back to sign in
-        </a>
-      </main>
-    );
-  }
+  // Send failures to the sign-in page, which explains them and offers the providers again
+  // (docs/ui-audit-2026-09.md §2), rather than a dead-end message here.
+  useEffect(() => {
+    if (error) router.replace("/signin?error=callback_failed");
+  }, [error, router]);
 
   return <FullPageLoading />;
 }

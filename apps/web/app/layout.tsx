@@ -22,8 +22,13 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InteractAI",
+  // docs/ui-audit-2026-09.md §1.5: every route sets its own `title`; this frames it.
+  title: { default: "InteractAI", template: "%s · InteractAI" },
   description: "Speak. Be answered convincingly and fast. Be scored defensibly.",
+  // Absolute URLs for the OG card (app/opengraph-image.tsx) need a base.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  openGraph: { siteName: "InteractAI", type: "website" },
+  twitter: { card: "summary_large_image" },
 };
 
 // Runs before hydration so the very first paint already has the right theme — without this a

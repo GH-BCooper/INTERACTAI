@@ -1,4 +1,8 @@
+import type { Metadata } from "next";
+
 import { PracticeRoom } from "@/components/practice/practice-room";
+
+export const metadata: Metadata = { title: "Practice room" };
 
 export default async function PracticePage({
   params,

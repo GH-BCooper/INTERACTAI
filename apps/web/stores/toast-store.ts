@@ -5,6 +5,8 @@ export interface Toast {
   title: string;
   description?: string;
   action?: { label: string; onClick: () => void };
+  /** Colours only the icon, with --status-* / --accent — never a rubric colour. */
+  variant?: "info" | "success" | "error";
 }
 
 interface ToastState {

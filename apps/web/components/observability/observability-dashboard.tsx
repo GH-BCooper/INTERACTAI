@@ -3,6 +3,8 @@
 import { clsx } from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { LocalDate } from "@/components/ui/local-date";
+import { AdminForbidden, AdminPageHeader, FilterSelect, WindowSelect } from "@/components/admin/admin-chrome";
 import { ApiError } from "@/lib/api/client";
 import {
   useAdminRecording,
@@ -168,7 +170,7 @@ function Waterfall() {
         >
           {(turns ?? []).map((t) => (
             <option key={t.turn_id} value={t.turn_id}>
-              {ms(t.e2e_ms)} · {new Date(t.created_at).toLocaleString()} · {t.turn_id.slice(0, 8)}
+              {`${ms(t.e2e_ms)} · ${new Date(t.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · ${t.turn_id.slice(0, 8)}`}
             </option>
           ))}
         </select>
@@ -348,7 +350,9 @@ function ModelCallTable() {
                 <td className="py-1.5 pr-3">{c.role}</td>
                 <td className="max-w-48 truncate py-1.5 pr-3">{c.model}</td>
                 <td className="py-1.5 pr-3">{c.prompt_version ?? "—"}</td>
-                <td className="py-1.5 pr-3">{new Date(c.created_at).toLocaleString()}</td>
+                <td className="py-1.5 pr-3">
+                  <LocalDate value={c.created_at} withTime />
+                </td>
                 <td className="py-1.5 pr-3">{c.tokens_in}</td>
                 <td className="py-1.5 pr-3">{c.tokens_out}</td>
                 <td className="py-1.5 pr-3">{ms(c.ttft_ms)}</td>
@@ -359,6 +363,9 @@ function ModelCallTable() {
             ))}
           </tbody>
         </table>
+        {data && data.items.length === 0 && (
+          <p className="border-t py-8 text-center text-sm text-[var(--text-tertiary)]">No model calls match these filters yet.</p>
+        )}
       </div>
       <div className="flex justify-end gap-2 text-xs">
         <button
@@ -428,51 +435,50 @@ export function ObservabilityDashboard() {
   const latency = useLatencyHeader(filter);
   const stages = useStageBreakdown(filter);
 
-  if (latency.error instanceof ApiError && latency.error.status === 403) {
-    return <div className="p-8 text-center text-sm text-[var(--text-secondary)]">Admins only.</div>;
-  }
+  if (latency.error instanceof ApiError && latency.error.status === 403) return <AdminForbidden />;
   const d = latency.data;
   const overBudget = d?.overall.p95 != null && d.overall.p95 > d.target_p95_ms;
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8">
-      <div>
-        <h1 className="text-lg font-medium">Observability</h1>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">End of speech → first audible word. Budget: p95 ≤ 1400 ms.</p>
-      </div>
-
-      <Section title="Latency — end-of-speech to first audio" subtitle="Queried directly from latency_events where stage = 'e2e'. Percentiles do not add; this is not a sum of stages.">
-        <div className="mb-4 flex flex-wrap gap-3 text-xs">
-          <label className="flex flex-col gap-1">
-            Window
-            <select className="h-8 rounded-md border bg-[var(--bg-raised)] px-2" value={filter.days} onChange={(e) => setFilter((f) => ({ ...f, days: Number(e.target.value) }))}>
-              {[1, 7, 30, 90, 365].map((n) => (
-                <option key={n} value={n}>
-                  last {n} day{n > 1 ? "s" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1">
-            Scenario family
-            <select className="h-8 rounded-md border bg-[var(--bg-raised)] px-2" value={filter.family ?? ""} onChange={(e) => setFilter((f) => ({ ...f, family: e.target.value || undefined }))}>
-              <option value="">all</option>
+    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6">
+      <AdminPageHeader
+        title="Observability"
+        description="End of speech → first audible word. Budget: p95 ≤ 1400 ms. The window and filters apply to the latency and stage panels."
+        filters={
+          <>
+            <WindowSelect value={filter.days} onChange={(days) => setFilter((f) => ({ ...f, days }))} />
+            <FilterSelect
+              id="obs-family"
+              label="Scenario family"
+              value={filter.family ?? ""}
+              onChange={(v) => setFilter((f) => ({ ...f, family: v || undefined }))}
+            >
+              <option value="">All families</option>
               {(d?.families ?? []).map((x) => (
                 <option key={x}>{x}</option>
               ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1">
-            Host class
-            <select className="h-8 rounded-md border bg-[var(--bg-raised)] px-2" value={filter.host_class ?? ""} onChange={(e) => setFilter((f) => ({ ...f, host_class: e.target.value || undefined }))}>
-              <option value="">all</option>
+            </FilterSelect>
+            <FilterSelect
+              id="obs-host"
+              label="Host class"
+              value={filter.host_class ?? ""}
+              onChange={(v) => setFilter((f) => ({ ...f, host_class: v || undefined }))}
+            >
+              <option value="">All hosts</option>
               {(d?.host_classes ?? []).map((x) => (
                 <option key={x}>{x}</option>
               ))}
-            </select>
-          </label>
-        </div>
-        {d ? (
+            </FilterSelect>
+          </>
+        }
+      />
+
+      <Section title="Latency — end-of-speech to first audio" subtitle="Queried directly from latency_events where stage = 'e2e'. Percentiles do not add; this is not a sum of stages.">
+        {d && d.overall.n === 0 ? (
+          <p className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-[var(--text-tertiary)]">
+            No latency events in this window yet. Run a practice session (or widen the window) and they appear here.
+          </p>
+        ) : d ? (
           <>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <Stat label="p50" value={ms(d.overall.p50)} />

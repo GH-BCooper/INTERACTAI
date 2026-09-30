@@ -37,7 +37,7 @@ export function Waveform({ containerRef, waveform, url, peaks, durationMs, turns
   if (peaks === null || durationMs === null) {
     return (
       <div className="flex h-16 items-center justify-center rounded-md border border-dashed text-xs text-[var(--text-tertiary)]">
-        No recording was captured for this session.
+        No recording is available for this session — none was captured, or it was deleted. The transcript and scores are unaffected.
       </div>
     );
   }

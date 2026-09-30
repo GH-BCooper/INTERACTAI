@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -79,12 +80,12 @@ export function MicPermissionError({ state, onRetry, secondaryAction }: MicPermi
           <p className="mt-3 text-xs text-[var(--text-tertiary)]">
             You won&apos;t be able to practise until your microphone works.
           </p>
-          <a
+          <Link
             href={secondaryAction.href}
             className="mt-1 inline-block text-xs text-[var(--text-secondary)] underline hover:text-[var(--text-primary)]"
           >
             {secondaryAction.label}
-          </a>
+          </Link>
         </>
       )}
     </div>

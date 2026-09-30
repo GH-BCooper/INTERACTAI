@@ -1,14 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { useCreateSession } from "@/lib/api/hooks";
-import { ApiError } from "@/lib/api/client";
-import type { Difficulty, ScenarioOut, TargetMinutes } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/field";
+import { capitalize } from "@/components/ui/primitives";
+import { Segmented } from "@/components/ui/segmented";
+import { Checkbox } from "@/components/ui/switch";
+import { ApiError } from "@/lib/api/client";
+import { useCreateSession, useMe, usePersonas } from "@/lib/api/hooks";
+import type { Difficulty, ScenarioOut, TargetMinutes } from "@/lib/api/types";
 
 import { ConsentScreen, type ConsentDecision } from "./consent-screen";
+import { VoicePreviewButton } from "./voice-preview-button";
 
 const DIFFICULTIES: Difficulty[] = ["gentle", "standard", "hard"];
 const DURATIONS: TargetMinutes[] = [5, 10, 20, 30];
@@ -17,16 +23,28 @@ function nearestDuration(minutes: number): TargetMinutes {
   return DURATIONS.reduce((best, d) => (Math.abs(d - minutes) < Math.abs(best - minutes) ? d : best));
 }
 
+function firstSentence(text: string): string {
+  const match = text.match(/^.*?[.!?](\s|$)/);
+  return (match ? match[0] : text).trim();
+}
+
+/** The moment of commitment (docs/ui-audit-2026-09.md §6): who you will talk to, what it is
+ * about, and two segmented choices. The research-consent path is admin-only — it exists for
+ * recruited usability sessions, which an admin runs, not for everyday practice. */
 export function StartSessionDialog({
+  open = true,
   scenario,
   onClose,
+  defaultMinutes,
 }: {
+  open?: boolean;
   scenario: ScenarioOut;
   onClose: () => void;
+  defaultMinutes?: TargetMinutes;
 }) {
   const [difficulty, setDifficulty] = useState<Difficulty>(scenario.difficulty);
   const [targetMinutes, setTargetMinutes] = useState<TargetMinutes>(
-    nearestDuration(scenario.duration_minutes),
+    defaultMinutes ?? nearestDuration(scenario.duration_minutes),
   );
   // Task 4.5a: "The recruited-session flow presents the consent screen before the audio
   // check." An ordinary personal-practice session skips this entirely and falls back to the
@@ -35,14 +53,9 @@ export function StartSessionDialog({
   const [showConsent, setShowConsent] = useState(false);
   const createSession = useCreateSession();
   const router = useRouter();
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  const { data: me } = useMe();
+  const { data: personas } = usePersonas();
+  const persona = personas?.find((p) => p.id === scenario.persona_id) ?? null;
 
   async function begin(consent?: ConsentDecision) {
     try {
@@ -68,18 +81,6 @@ export function StartSessionDialog({
     void begin();
   }
 
-  if (showConsent) {
-    return (
-      <ConsentScreen
-        onCancel={() => setShowConsent(false)}
-        onDecide={(decision) => {
-          setShowConsent(false);
-          void begin(decision);
-        }}
-      />
-    );
-  }
-
   const errorMessage =
     createSession.error instanceof ApiError
       ? createSession.error.message
@@ -88,83 +89,102 @@ export function StartSessionDialog({
         : null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="start-session-title"
+    <Dialog
+      open={open}
+      onClose={onClose}
+      labelledBy={showConsent ? "consent-title" : "start-session-title"}
+      className="max-w-md p-5"
     >
-      <div
-        className="w-full max-w-sm rounded-lg border bg-[var(--bg-card)] p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="start-session-title" className="text-md font-medium">
-          {scenario.title}
-        </h2>
-        <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-          {scenario.family} · {scenario.duration_minutes} min authored length
-        </p>
+      {showConsent ? (
+        <ConsentScreen
+          onCancel={() => setShowConsent(false)}
+          onDecide={(decision) => {
+            setShowConsent(false);
+            void begin(decision);
+          }}
+        />
+      ) : (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">{capitalize(scenario.family)}</p>
+          <h2 id="start-session-title" className="mt-1 text-md font-medium">
+            {scenario.title}
+          </h2>
+          <p className="mt-1 line-clamp-2 text-sm text-[var(--text-secondary)]">{firstSentence(scenario.brief)}</p>
 
-        <label className="mt-4 block text-xs text-[var(--text-secondary)]" htmlFor="difficulty-select">
-          Difficulty
-        </label>
-        <select
-          id="difficulty-select"
-          value={difficulty}
-          onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-          className="mt-1 w-full rounded-md border bg-[var(--bg-page)] px-3 py-2 text-sm"
-        >
-          {DIFFICULTIES.map((d) => (
-            <option key={d} value={d}>
-              {d[0]!.toUpperCase() + d.slice(1)}
-            </option>
-          ))}
-        </select>
+          {persona && (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border bg-[var(--bg-page)] p-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  aria-hidden
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[var(--accent)] text-sm font-medium"
+                >
+                  {persona.name.charAt(0)}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{persona.name}</p>
+                  <p className="truncate text-xs text-[var(--text-tertiary)]">
+                    {capitalize(persona.archetype)} · {capitalize(persona.temperament)}
+                  </p>
+                </div>
+              </div>
+              <VoicePreviewButton personaId={persona.id} />
+            </div>
+          )}
 
-        <label className="mt-3 block text-xs text-[var(--text-secondary)]" htmlFor="duration-select">
-          Duration
-        </label>
-        <select
-          id="duration-select"
-          value={targetMinutes}
-          onChange={(e) => setTargetMinutes(Number(e.target.value) as TargetMinutes)}
-          className="mt-1 w-full rounded-md border bg-[var(--bg-page)] px-3 py-2 text-sm"
-        >
-          {DURATIONS.map((d) => (
-            <option key={d} value={d}>
-              {d} minutes
-            </option>
-          ))}
-        </select>
-
-        <label className="mt-4 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-          <input
-            type="checkbox"
-            checked={isRecruitedSession}
-            onChange={(e) => setIsRecruitedSession(e.target.checked)}
+          <Label className="mt-5">Difficulty</Label>
+          <Segmented
+            className="mt-1.5"
+            variant="segmented"
+            size="md"
+            label="Difficulty"
+            value={difficulty}
+            onChange={setDifficulty}
+            options={DIFFICULTIES.map((d) => ({ value: d, label: capitalize(d) }))}
           />
-          This is a recruited/research session (shows a consent screen first)
-        </label>
 
-        {errorMessage && (
-          <p role="alert" className="mt-3 text-xs text-[var(--danger)]">
-            {errorMessage}
-            {createSession.error instanceof ApiError && createSession.error.recovery
-              ? ` ${createSession.error.recovery}`
-              : ""}
-          </p>
-        )}
+          <Label className="mt-4">Length</Label>
+          <Segmented
+            className="mt-1.5"
+            variant="segmented"
+            size="md"
+            label="Length"
+            value={targetMinutes}
+            onChange={setTargetMinutes}
+            options={DURATIONS.map((d) => ({ value: d, label: `${d} min` }))}
+          />
 
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="primary" size="sm" onClick={onBeginClicked} disabled={createSession.isPending}>
-            {createSession.isPending ? "Starting…" : "Begin session"}
-          </Button>
+          {me?.user.is_admin && (
+            <Checkbox
+              checked={isRecruitedSession}
+              onChange={setIsRecruitedSession}
+              className="mt-4 text-xs text-[var(--text-secondary)]"
+            >
+              Recruited/research session (shows a consent screen first) · admin
+            </Checkbox>
+          )}
+
+          {errorMessage && (
+            <p role="alert" className="mt-3 text-xs text-[var(--status-bad)]">
+              {errorMessage}
+              {createSession.error instanceof ApiError && createSession.error.recovery
+                ? ` ${createSession.error.recovery}`
+                : ""}
+            </p>
+          )}
+
+          <div className="mt-6 flex items-center justify-between gap-2">
+            <p className="text-xs text-[var(--text-tertiary)]">You&apos;ll check your mic before it starts.</p>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="sm" onClick={onBeginClicked} disabled={createSession.isPending} data-autofocus>
+                {createSession.isPending ? "Starting…" : "Begin session"}
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </Dialog>
   );
 }

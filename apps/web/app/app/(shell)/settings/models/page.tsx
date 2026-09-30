@@ -1,9 +1,14 @@
 "use client";
 
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, KeyRound, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { SaveStatus } from "@/components/settings/save-status";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/field";
+import { LocalDate } from "@/components/ui/local-date";
+import { Card, Pill } from "@/components/ui/primitives";
+import { Switch } from "@/components/ui/switch";
 import {
   useDeleteProvider,
   useModelsSettings,
@@ -24,6 +29,7 @@ export default function ModelsSettingsPage() {
   const [apiKey, setApiKey] = useState("");
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [preferLocal, setPreferLocal] = useState(false);
+  const [preferSavedAt, setPreferSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (modelsSettings) setPreferLocal(modelsSettings.prefer_local_models);
@@ -52,13 +58,37 @@ export default function ModelsSettingsPage() {
         </p>
 
         {groq ? (
-          <div className="mt-3 flex items-center justify-between rounded-lg border bg-[var(--bg-card)] p-3">
-            <div className="flex items-center gap-2 text-sm">
-              {groq.last_test_status === "success" && <CheckCircle2 size={16} className="text-[var(--status-ok)]" />}
-              {groq.last_test_status === "failed" && <XCircle size={16} className="text-[var(--status-bad)]" />}
-              <span>A key is saved ({groq.last_test_status.replace("_", " ")})</span>
+          <Card className="mt-3 flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3 text-sm">
+              <KeyRound size={16} aria-hidden className="shrink-0 text-[var(--text-tertiary)]" />
+              <div className="min-w-0">
+                {/* The key itself is never sent back to the browser — only that one exists. */}
+                <p className="font-mono tracking-wider" aria-label="Saved Groq key, hidden">
+                  gsk_••••••••••••
+                </p>
+                <p className="mt-0.5 text-xs text-[var(--text-tertiary)]">
+                  {groq.last_tested_at ? (
+                    <>
+                      Last tested <LocalDate value={groq.last_tested_at} relative />
+                    </>
+                  ) : (
+                    "Not tested yet"
+                  )}
+                </p>
+              </div>
+              {groq.last_test_status === "success" && (
+                <Pill tone="ok">
+                  <CheckCircle2 size={12} aria-hidden /> Working
+                </Pill>
+              )}
+              {groq.last_test_status === "failed" && (
+                <Pill tone="bad">
+                  <XCircle size={12} aria-hidden /> Failed
+                </Pill>
+              )}
+              {groq.last_test_status !== "success" && groq.last_test_status !== "failed" && <Pill>Untested</Pill>}
             </div>
-            <div className="flex gap-2">
+            <div className="flex shrink-0 gap-2">
               <Button variant="secondary" size="sm" onClick={() => void test()} disabled={testProvider.isPending}>
                 {testProvider.isPending ? "Testing…" : "Test connection"}
               </Button>
@@ -71,18 +101,19 @@ export default function ModelsSettingsPage() {
                 Remove
               </Button>
             </div>
-          </div>
+          </Card>
         ) : (
           <div className="mt-3 flex gap-2">
-            <input
+            <Input
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="gsk_…"
               aria-label="Groq API key"
-              className="flex-1 rounded-md border bg-[var(--bg-card)] px-3 py-2 text-sm"
+              autoComplete="off"
+              className="flex-1"
             />
-            <Button variant="primary" size="sm" onClick={() => void save()} disabled={!apiKey || saveProvider.isPending}>
+            <Button variant="primary" onClick={() => void save()} disabled={!apiKey || saveProvider.isPending}>
               {saveProvider.isPending ? "Saving…" : "Save"}
             </Button>
           </div>
@@ -95,25 +126,30 @@ export default function ModelsSettingsPage() {
         )}
       </section>
 
-      <section>
-        <label className="flex items-center justify-between text-sm">
-          <span>
-            Prefer local models
-            <span className="mt-0.5 block text-xs text-[var(--text-secondary)]">
-              Route to the locally-hosted model where available instead of the hosted default.
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            checked={preferLocal}
-            onChange={(e) => {
-              setPreferLocal(e.target.checked);
-              void updateModelsSettings.mutateAsync({ prefer_local_models: e.target.checked });
-            }}
-            className="shrink-0"
+      <Card className="p-4">
+        <Switch
+          label="Prefer local models"
+          description="Route to the locally-hosted model where available instead of the hosted default."
+          checked={preferLocal}
+          onChange={(next) => {
+            setPreferLocal(next);
+            updateModelsSettings.mutate(
+              { prefer_local_models: next },
+              {
+                onSuccess: () => setPreferSavedAt(Date.now()),
+                onError: () => setPreferLocal(!next),
+              },
+            );
+          }}
+        />
+        <div className="mt-2 flex justify-end">
+          <SaveStatus
+            pending={updateModelsSettings.isPending}
+            savedAt={preferSavedAt}
+            error={updateModelsSettings.error ? "Couldn't save. Try again." : null}
           />
-        </label>
-      </section>
+        </div>
+      </Card>
     </div>
   );
 }

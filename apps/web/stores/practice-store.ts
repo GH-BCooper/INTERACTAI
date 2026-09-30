@@ -30,7 +30,11 @@ interface PracticeState {
   reportPending: boolean;
   distressExitPending: boolean;
   personaTurnBuffer: string;
+  /** Answers the user has given this session (from `turn_finalized.turn_index`, so a resumed
+   * connection can't double-count). Only used for the "Session saved" summary. */
+  answersGiven: number;
 
+  noteTurnFinalized: (turnIndex: number) => void;
   setClientState: (s: ClientState) => void;
   setConnection: (c: ConnectionUiState) => void;
   setUserPartialCaption: (text: string) => void;
@@ -55,11 +59,13 @@ const INITIAL = {
   reportPending: false,
   distressExitPending: false,
   personaTurnBuffer: "",
+  answersGiven: 0,
 };
 
 export const usePracticeStore = create<PracticeState>((set, get) => ({
   ...INITIAL,
 
+  noteTurnFinalized: (turnIndex) => set({ answersGiven: Math.max(get().answersGiven, turnIndex + 1) }),
   setClientState: (clientState) => set({ clientState }),
   setConnection: (connection) => set({ connection }),
 

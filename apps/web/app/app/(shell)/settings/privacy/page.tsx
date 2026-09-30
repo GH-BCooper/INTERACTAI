@@ -3,7 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { SaveStatus } from "@/components/settings/save-status";
 import { Button } from "@/components/ui/button";
+import { FieldHint, Input, Label, Select } from "@/components/ui/field";
+import { Card } from "@/components/ui/primitives";
+import { Switch } from "@/components/ui/switch";
+import { downloadJson } from "@/lib/download";
 import {
   useDeleteMe,
   useExportMyData,
@@ -19,16 +24,6 @@ const RETENTION_OPTIONS = [
   { value: 90, label: "90 days" },
 ];
 
-function downloadJson(filename: string, data: unknown): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 export default function PrivacySettingsPage() {
   const router = useRouter();
   const { data: privacy } = usePrivacySettings();
@@ -41,6 +36,7 @@ export default function PrivacySettingsPage() {
   const [retentionDays, setRetentionDays] = useState(30);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (privacy) {
@@ -49,14 +45,27 @@ export default function PrivacySettingsPage() {
     }
   }, [privacy]);
 
+  async function savePrivacy(body: { training_consent?: boolean; audio_retention_days?: number }) {
+    try {
+      await updatePrivacy.mutateAsync(body);
+      setSavedAt(Date.now());
+    } catch {
+      // Roll the control back to the server's value; SaveStatus shows the failure.
+      if (privacy) {
+        setTrainingConsent(privacy.training_consent);
+        setRetentionDays(privacy.audio_retention_days);
+      }
+    }
+  }
+
   async function toggleTrainingConsent(next: boolean) {
     setTrainingConsent(next);
-    await updatePrivacy.mutateAsync({ training_consent: next });
+    await savePrivacy({ training_consent: next });
   }
 
   async function changeRetention(next: number) {
     setRetentionDays(next);
-    await updatePrivacy.mutateAsync({ audio_retention_days: next });
+    await savePrivacy({ audio_retention_days: next });
   }
 
   async function doExport() {
@@ -72,45 +81,41 @@ export default function PrivacySettingsPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <section>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">Training data consent</p>
-            <p className="mt-1 max-w-md text-xs text-[var(--text-secondary)]">
-              When on, your future sessions may be used (in de-identified form) to improve
-              scoring. This is never bundled into anything else — you can revoke it any time,
-              and revoking excludes your existing turns from any future training data build.
-            </p>
-          </div>
-          <input
-            type="checkbox"
-            aria-label="Training data consent"
-            checked={trainingConsent}
-            onChange={(e) => void toggleTrainingConsent(e.target.checked)}
-            className="shrink-0"
-          />
-        </div>
-      </section>
+      <div className="flex justify-end">
+        <SaveStatus
+          pending={updatePrivacy.isPending}
+          savedAt={savedAt}
+          error={updatePrivacy.error ? "Couldn't save that change. Try again." : null}
+        />
+      </div>
+
+      <Card className="p-4">
+        <Switch
+          label={<span className="font-medium">Training data consent</span>}
+          description="When on, your future sessions may be used (in de-identified form) to improve scoring. This is never bundled into anything else — you can revoke it any time, and revoking excludes your existing turns from any future training data build."
+          checked={trainingConsent}
+          onChange={(next) => void toggleTrainingConsent(next)}
+        />
+      </Card>
 
       <section>
-        <label className="block text-xs text-[var(--text-secondary)]" htmlFor="retention">
-          Audio retention
-        </label>
-        <select
+        <Label htmlFor="retention">Audio retention</Label>
+        <Select
           id="retention"
+          className="mt-1"
           value={retentionDays}
           onChange={(e) => void changeRetention(Number(e.target.value))}
-          className="mt-1 w-full rounded-md border bg-[var(--bg-card)] px-3 py-2 text-sm"
         >
           {RETENTION_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
           ))}
-        </select>
-        <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-          Applies to future sessions. A background job purges recordings past this window.
-        </p>
+        </Select>
+        <FieldHint>
+          Applies to future sessions. A background job purges recordings past this window. You can also delete a
+          single recording from its report.
+        </FieldHint>
       </section>
 
       <section>
@@ -123,8 +128,12 @@ export default function PrivacySettingsPage() {
         </Button>
       </section>
 
-      <section className="rounded-lg border border-[var(--danger)]/40 p-4">
-        <p className="text-sm font-medium text-[var(--danger)]">Delete account</p>
+      <section aria-labelledby="danger-zone" className="mt-4 border-t pt-8">
+        <h2 id="danger-zone" className="text-xs font-medium uppercase tracking-wide text-[var(--danger)]">
+          Danger zone
+        </h2>
+        <div className="mt-3 rounded-lg border border-[var(--danger)]/40 p-4">
+        <p className="text-sm font-medium">Delete account</p>
         <p className="mt-1 text-xs text-[var(--text-secondary)]">
           Permanently deletes your account, sessions, transcripts, scores and stored audio.
           This cannot be undone.
@@ -135,14 +144,15 @@ export default function PrivacySettingsPage() {
           </Button>
         ) : (
           <div className="mt-3 flex flex-col gap-2">
-            <label className="text-xs text-[var(--text-secondary)]" htmlFor="delete-confirm">
-              Type DELETE to confirm
-            </label>
-            <input
+            <Label htmlFor="delete-confirm">
+              Type <span className="font-mono text-[var(--text-primary)]">DELETE</span> to confirm
+            </Label>
+            <Input
               id="delete-confirm"
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
-              className="w-full rounded-md border bg-[var(--bg-card)] px-3 py-2 text-sm"
+              autoComplete="off"
+              autoFocus
             />
             <div className="flex gap-2">
               <Button
@@ -153,12 +163,20 @@ export default function PrivacySettingsPage() {
               >
                 {deleteMe.isPending ? "Deleting…" : "Permanently delete"}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  setDeleteConfirmText("");
+                }}
+              >
                 Cancel
               </Button>
             </div>
           </div>
         )}
+        </div>
       </section>
     </div>
   );

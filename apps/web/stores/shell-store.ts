@@ -3,6 +3,9 @@ import { create } from "zustand";
 interface ShellState {
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
+  /** Below `md` the sidebar is a drawer (docs/ui-audit-2026-09.md §1.6). Never persisted. */
+  mobileNavOpen: boolean;
+  setMobileNavOpen: (open: boolean) => void;
   commandPaletteOpen: boolean;
   openCommandPalette: () => void;
   closeCommandPalette: () => void;
@@ -54,6 +57,8 @@ export const useShellStore = create<ShellState>((set, get) => ({
     set({ sidebarCollapsed: next });
     writeBool(SIDEBAR_KEY, next);
   },
+  mobileNavOpen: false,
+  setMobileNavOpen: (mobileNavOpen) => set({ mobileNavOpen }),
   commandPaletteOpen: false,
   openCommandPalette: () => set({ commandPaletteOpen: true }),
   closeCommandPalette: () => set({ commandPaletteOpen: false }),

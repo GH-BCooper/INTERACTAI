@@ -15,6 +15,7 @@ import {
   type LatencyFilter,
   type ModelCallFilter,
   type ProfileUpdateBody,
+  type SessionListParams,
 } from "./resources";
 import type { ProviderName } from "./types";
 
@@ -103,6 +104,7 @@ export function useProgress(family?: string) {
   return useQuery({
     queryKey: ["me", "progress", family ?? null],
     queryFn: () => me.progress(family),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -146,11 +148,26 @@ export function useRubric(id: string | null | undefined) {
   });
 }
 
-export function useSessions(params?: { limit?: number; offset?: number }) {
+export function useSessions(params?: SessionListParams) {
   return useQuery({
-    queryKey: ["sessions", params ?? {}],
+    queryKey: ["sessions", "list", params ?? {}],
     queryFn: () => sessions.list(params),
+    placeholderData: (previous) => previous,
   });
+}
+
+export function useDeleteRecording(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => sessions.deleteRecording(sessionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sessions", sessionId] });
+    },
+  });
+}
+
+export function useExportSession(sessionId: string) {
+  return useMutation({ mutationFn: () => sessions.export(sessionId) });
 }
 
 export function useSession(id: string | undefined) {
@@ -169,11 +186,16 @@ export function useCreateSession() {
   });
 }
 
-export function useSessionReport(id: string | undefined, options?: { pollWhilePending?: boolean }) {
+export function useSessionReport(
+  id: string | undefined,
+  options?: { pollWhilePending?: boolean; enabled?: boolean },
+) {
   return useQuery({
     queryKey: ["sessions", id, "report"],
     queryFn: () => sessions.getReport(id as string),
-    enabled: !!id,
+    // Callers gate this on the session having ended: before that (or for a session that doesn't
+    // exist) a 404 is permanent, and the retry rule below would otherwise poll it indefinitely.
+    enabled: !!id && (options?.enabled ?? true),
     retry: (failureCount, error) => {
       // A 404 here means "not generated yet", not a real error — TASK 3.3g: the report keeps
       // polling until the coach job finishes rather than surfacing a permanent failure.

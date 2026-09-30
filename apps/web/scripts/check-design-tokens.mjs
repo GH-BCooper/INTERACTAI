@@ -27,6 +27,10 @@ const SCORE_TOKENS = /--score-(strong|developing|weak|insufficient)\b/g;
 // judgement call at review time.
 const SCORE_TOKEN_ALLOWED_DIR = join(ROOT, "components", "score");
 
+// The one file allowed raw hex: the palette for next/og images (OG card, apple icon), which are
+// rendered to PNG by Satori where CSS custom properties do not exist. It documents itself.
+const HEX_ALLOWED_FILES = new Set([join(ROOT, "app", "brand-image-palette.ts")]);
+
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     if (name === "node_modules" || name === ".next") continue;
@@ -60,7 +64,7 @@ for (const dir of SCAN_DIRS) {
     scanned += 1;
     const text = readFileSync(file, "utf8");
 
-    for (const match of text.matchAll(HEX_COLOR)) {
+    for (const match of HEX_ALLOWED_FILES.has(file) ? [] : text.matchAll(HEX_COLOR)) {
       failures.push(`${file}: raw hex colour "${match[0]}" — use a design token instead`);
     }
 

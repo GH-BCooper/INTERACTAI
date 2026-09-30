@@ -1,10 +1,13 @@
 "use client";
 
-import { Briefcase, Code, HandCoins } from "lucide-react";
+import { clsx } from "clsx";
+import { ArrowLeft, Briefcase, Check, Code, HandCoins } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { ProfileFields, type ProfileValues } from "@/components/settings/profile-fields";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Wordmark } from "@/components/ui/logo";
 import { useCompleteOnboarding, useCreateSession, useMe, useScenarios, useUpdateProfile } from "@/lib/api/hooks";
 import type { ExperienceLevel, Goal } from "@/lib/api/types";
 
@@ -29,31 +32,46 @@ const GOAL_CARDS: { goal: Goal; title: string; body: string; icon: typeof Briefc
   },
 ];
 
-const EXPERIENCE_LEVELS: { value: ExperienceLevel; label: string }[] = [
-  { value: "student", label: "Student" },
-  { value: "early_career", label: "Early career" },
-  { value: "mid_level", label: "Mid-level" },
-  { value: "senior", label: "Senior" },
-  { value: "staff_plus", label: "Staff+" },
-];
-
 const GOAL_TO_FAMILY: Record<Goal, string> = {
   job_interview: "behavioural",
   technical_interview: "technical",
   salary_negotiation: "negotiation",
 };
 
+const STEP_LABELS = ["Your goal", "About you", "First session"] as const;
+
+/** docs/ui-audit-2026-09.md §3: a labelled rail and "Step n of 3", not three bare bars. */
 function ProgressRail({ step }: { step: 1 | 2 | 3 }) {
   return (
-    <ol className="flex items-center gap-2" aria-label="Onboarding progress">
-      {[1, 2, 3].map((s) => (
-        <li
-          key={s}
-          aria-current={step === s ? "step" : undefined}
-          className={`h-1.5 w-10 rounded-full ${s <= step ? "bg-[var(--accent)]" : "bg-[var(--border)]"}`}
-        />
-      ))}
-    </ol>
+    <div>
+      <p className="text-xs text-[var(--text-tertiary)]">
+        Step {step} of 3 · {STEP_LABELS[step - 1]}
+      </p>
+      <ol className="mt-2 grid grid-cols-3 gap-2" aria-label="Onboarding progress">
+        {STEP_LABELS.map((label, i) => {
+          const s = i + 1;
+          return (
+            <li key={label} aria-current={step === s ? "step" : undefined} className="flex flex-col gap-1.5">
+              <span
+                className={clsx(
+                  "h-1.5 rounded-full transition-colors duration-150",
+                  s <= step ? "bg-[var(--accent)]" : "bg-[var(--border)]",
+                )}
+              />
+              <span
+                className={clsx(
+                  "flex items-center gap-1 text-xs",
+                  s === step ? "text-[var(--text-primary)]" : "text-[var(--text-tertiary)]",
+                )}
+              >
+                {s < step && <Check size={12} aria-hidden />}
+                {label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -83,14 +101,19 @@ function GoalStep({ onChoose, pending }: { onChoose: (goal: Goal) => void; pendi
 
 function ProfileStep({
   onContinue,
+  onBack,
   pending,
 }: {
   onContinue: (fields: { target_role: string; experience_level: ExperienceLevel; resume_text: string }) => void;
+  onBack: () => void;
   pending: boolean;
 }) {
-  const [targetRole, setTargetRole] = useState("");
-  const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>("early_career");
-  const [resumeText, setResumeText] = useState("");
+  const [values, setValues] = useState<ProfileValues>({
+    goal: "",
+    targetRole: "",
+    experienceLevel: "early_career",
+    resumeText: "",
+  });
 
   return (
     <div>
@@ -99,58 +122,28 @@ function ProfileStep({
         Used to tailor practice sessions — never shown to the persona verbatim.
       </p>
 
-      <label className="mt-6 block text-xs text-[var(--text-secondary)]" htmlFor="target-role">
-        Target role
-      </label>
-      <input
-        id="target-role"
-        value={targetRole}
-        onChange={(e) => setTargetRole(e.target.value)}
-        placeholder="e.g. Senior backend engineer"
-        className="mt-1 w-full rounded-md border bg-[var(--bg-card)] px-3 py-2 text-sm"
-      />
+      <div className="mt-6">
+        <ProfileFields values={values} onChange={setValues} showGoal={false} allowUnset={false} resumeRows={6} />
+      </div>
 
-      <label className="mt-4 block text-xs text-[var(--text-secondary)]" htmlFor="experience-level">
-        Experience level
-      </label>
-      <select
-        id="experience-level"
-        value={experienceLevel}
-        onChange={(e) => setExperienceLevel(e.target.value as ExperienceLevel)}
-        className="mt-1 w-full rounded-md border bg-[var(--bg-card)] px-3 py-2 text-sm"
-      >
-        {EXPERIENCE_LEVELS.map((l) => (
-          <option key={l.value} value={l.value}>
-            {l.label}
-          </option>
-        ))}
-      </select>
-
-      <label className="mt-4 block text-xs text-[var(--text-secondary)]" htmlFor="resume-text">
-        Resume (optional)
-      </label>
-      <textarea
-        id="resume-text"
-        value={resumeText}
-        onChange={(e) => setResumeText(e.target.value)}
-        rows={6}
-        placeholder="Paste your resume as plain text."
-        className="mt-1 w-full rounded-md border bg-[var(--bg-card)] px-3 py-2 text-sm"
-      />
-      <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-        Optional. If you paste it, it&apos;s used to tailor your practice questions and is never shared outside your
-        account — you can delete it any time in Settings.
-      </p>
-
-      <Button
-        variant="primary"
-        size="md"
-        className="mt-5"
-        disabled={pending}
-        onClick={() => onContinue({ target_role: targetRole, experience_level: experienceLevel, resume_text: resumeText })}
-      >
-        {pending ? "Saving…" : "Continue"}
-      </Button>
+      <div className="mt-6 flex items-center justify-between">
+        <Button variant="ghost" onClick={onBack} disabled={pending}>
+          <ArrowLeft size={14} aria-hidden /> Back
+        </Button>
+        <Button
+          variant="primary"
+          disabled={pending}
+          onClick={() =>
+            onContinue({
+              target_role: values.targetRole,
+              experience_level: (values.experienceLevel || "early_career") as ExperienceLevel,
+              resume_text: values.resumeText,
+            })
+          }
+        >
+          {pending ? "Saving…" : "Continue"}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -171,9 +164,12 @@ export default function OnboardingPage() {
   const createSession = useCreateSession();
   const completeOnboarding = useCompleteOnboarding();
   const [launching, setLaunching] = useState(false);
+  // "Back" from step 2 re-opens the goal choice locally; picking a goal again saves it and moves on.
+  const [editingGoal, setEditingGoal] = useState(false);
 
   const profile = me?.profile ?? null;
-  const step: 1 | 2 | 3 = !profile?.goal ? 1 : !profile.experience_level ? 2 : 3;
+  const serverStep: 1 | 2 | 3 = !profile?.goal ? 1 : !profile.experience_level ? 2 : 3;
+  const step: 1 | 2 | 3 = editingGoal && serverStep === 2 ? 1 : serverStep;
 
   const { data: goalScenarios } = useScenarios(
     profile?.goal ? { family: GOAL_TO_FAMILY[profile.goal], difficulty: "gentle" } : undefined,
@@ -220,16 +216,19 @@ export default function OnboardingPage() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-6 py-12">
+      <Wordmark className="mb-10 text-sm" />
       <ProgressRail step={step} />
-      <div className="mt-6">
+      {/* Keyed by step so each step slides in (400ms panel motion token). */}
+      <div key={step} className="mt-8 animate-panel-in">
         {step === 1 && (
           <GoalStep
             pending={updateProfile.isPending}
-            onChoose={(goal) => updateProfile.mutate({ goal })}
+            onChoose={(goal) => updateProfile.mutate({ goal }, { onSuccess: () => setEditingGoal(false) })}
           />
         )}
         {step === 2 && (
           <ProfileStep
+            onBack={() => setEditingGoal(true)}
             pending={updateProfile.isPending}
             onContinue={({ target_role, experience_level, resume_text }) =>
               updateProfile.mutate({
@@ -246,11 +245,9 @@ export default function OnboardingPage() {
             <p className="text-sm text-[var(--text-secondary)]">
               We couldn&apos;t start your first session automatically.
             </p>
-            <a href="/app/scenarios" className="mt-3 inline-block">
-              <Button variant="primary" size="sm">
-                Browse scenarios instead
-              </Button>
-            </a>
+            <ButtonLink href="/app/scenarios" variant="primary" size="sm" className="mt-3">
+              Browse scenarios instead
+            </ButtonLink>
           </div>
         )}
       </div>

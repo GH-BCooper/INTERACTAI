@@ -1,4 +1,5 @@
-import { Captions, Mic, MicOff, PhoneOff } from "lucide-react";
+import { clsx } from "clsx";
+import { Captions, CaptionsOff, Mic, MicOff, PhoneOff } from "lucide-react";
 
 import { MicLevelMeter } from "./mic-level-meter";
 
@@ -11,7 +12,11 @@ interface ControlsProps {
   meterRef: React.RefObject<HTMLDivElement | null>;
 }
 
-/** Task 3.2: "Controls. Mute, end session, captions toggle. Nothing else." */
+const ROUND =
+  "flex h-11 w-11 items-center justify-center rounded-full border text-[var(--text-primary)] transition-colors duration-150 hover:bg-[var(--bg-raised)]";
+
+/** Task 3.2: "Controls. Mute, end session, captions toggle. Nothing else." The keyboard
+ * shortcuts (M, C, Esc — wired in practice-room.tsx) are named in each tooltip. */
 export function Controls({
   muted,
   onToggleMute,
@@ -29,7 +34,9 @@ export function Controls({
         onClick={onToggleMute}
         aria-pressed={muted}
         aria-label={muted ? "Unmute microphone" : "Mute microphone"}
-        className="flex h-10 w-10 items-center justify-center rounded-full border text-[var(--text-primary)] hover:bg-[var(--bg-raised)]"
+        aria-keyshortcuts="M"
+        title={`${muted ? "Unmute" : "Mute"} (M)`}
+        className={clsx(ROUND, muted && "border-[var(--status-bad)] text-[var(--status-bad)]")}
       >
         {muted ? <MicOff size={18} /> : <Mic size={18} />}
       </button>
@@ -39,16 +46,20 @@ export function Controls({
         onClick={onToggleCaptions}
         aria-pressed={captionsEnabled}
         aria-label={captionsEnabled ? "Turn captions off" : "Turn captions on"}
-        className="flex h-10 w-10 items-center justify-center rounded-full border text-[var(--text-primary)] hover:bg-[var(--bg-raised)]"
+        aria-keyshortcuts="C"
+        title={`Captions ${captionsEnabled ? "off" : "on"} (C)`}
+        className={ROUND}
       >
-        <Captions size={18} />
+        {captionsEnabled ? <Captions size={18} /> : <CaptionsOff size={18} />}
       </button>
 
       <button
         type="button"
         onClick={onEndClick}
         aria-label="End session"
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--danger)] text-[var(--text-on-accent)] hover:bg-[var(--danger-hover)]"
+        aria-keyshortcuts="Escape"
+        title="End session (Esc, then confirm)"
+        className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--danger)] text-[var(--text-on-accent)] transition-colors duration-150 hover:bg-[var(--danger-hover)]"
       >
         <PhoneOff size={18} />
       </button>

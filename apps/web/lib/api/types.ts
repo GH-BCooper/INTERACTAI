@@ -168,6 +168,24 @@ export interface SessionOut {
   retry_of_turn_id: string | null;
 }
 
+/** `GET /sessions` rows — SessionOut plus what a list needs to be scannable (docs/ui-audit-
+ * 2026-09.md §8). Title/family/difficulty come from the session's frozen brief. */
+export interface SessionListItemOut extends SessionOut {
+  scenario_title: string;
+  scenario_family: string | null;
+  difficulty: string | null;
+  overall_score: number | null;
+  report_status: string | null;
+}
+
+export interface SessionExportOut {
+  exported_at: string;
+  session: SessionListItemOut;
+  report: ReportOut | null;
+  scores: SessionScoreOut[];
+  turns: TurnOut[];
+}
+
 export interface WsTokenOut {
   token: string;
   expires_in: number;
@@ -288,9 +306,12 @@ export interface RecommendationOut {
 export interface ProgressStripOut {
   sessions_this_week: number;
   total_minutes_this_week: number;
+  total_minutes_last_week: number;
   overall_score: number | null;
   overall_score_delta: number | null;
   weakest_criterion_name: string | null;
+  weakest_criterion_key: string | null;
+  weakest_criterion_family: string | null;
 }
 
 export interface RecentSessionOut {

@@ -1,48 +1,34 @@
 "use client";
 
-import { Play, Volume2 } from "lucide-react";
+import { Play } from "lucide-react";
+import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useState } from "react";
 
 import { StartSessionDialog } from "@/components/dashboard/start-session-dialog";
+import { VoicePreviewButton } from "@/components/dashboard/voice-preview-button";
 import { ScoreBadge } from "@/components/score/score-badge";
 import { Button } from "@/components/ui/button";
+import { LocalDate } from "@/components/ui/local-date";
+import { capitalize, DifficultyMeter, Skeleton } from "@/components/ui/primitives";
 import { usePersonas, useRubric, useScenario, useScenarioProgress } from "@/lib/api/hooks";
-import { fetchVoicePreviewUrl } from "@/lib/audio/voice-preview";
 
 function DetailSkeleton() {
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
-      <div className="h-8 w-64 animate-pulse rounded bg-[var(--bg-card)]" />
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6" aria-busy="true">
+      <Skeleton className="h-3 w-32" />
+      <Skeleton className="mt-2 h-7 w-64" />
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 h-96 animate-pulse rounded-lg border bg-[var(--bg-card)]" />
-        <div className="h-64 animate-pulse rounded-lg border bg-[var(--bg-card)]" />
+        <div className="flex flex-col gap-3 lg:col-span-2">
+          <Skeleton className="h-5 w-20" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-11/12" />
+          <Skeleton className="h-4 w-4/5" />
+          <Skeleton className="mt-4 h-28 w-full rounded-lg" />
+        </div>
+        <Skeleton className="h-52 rounded-lg" />
       </div>
     </div>
-  );
-}
-
-function VoicePreviewButton({ personaId }: { personaId: string }) {
-  const [state, setState] = useState<"idle" | "loading" | "playing" | "failed">("idle");
-
-  async function play() {
-    setState("loading");
-    const url = await fetchVoicePreviewUrl(personaId);
-    if (!url) {
-      setState("failed");
-      return;
-    }
-    const audio = new Audio(url);
-    audio.addEventListener("ended", () => setState("idle"));
-    setState("playing");
-    void audio.play();
-  }
-
-  return (
-    <Button variant="secondary" size="sm" onClick={() => void play()} disabled={state === "loading" || state === "playing"}>
-      <Volume2 size={14} />
-      {state === "loading" ? "Loading…" : state === "playing" ? "Playing…" : state === "failed" ? "Preview unavailable" : "Preview voice"}
-    </Button>
   );
 }
 
@@ -62,10 +48,8 @@ export default function ScenarioDetailPage() {
   const progress = scenarioProgress?.[scenario.id];
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8">
-      <p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">
-        {scenario.family} · {scenario.difficulty}
-      </p>
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <p className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">{capitalize(scenario.family)}</p>
       <h1 className="mt-1 text-lg font-medium">{scenario.title}</h1>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -83,8 +67,8 @@ export default function ScenarioDetailPage() {
               <div className="mt-2 flex items-start justify-between gap-4 rounded-lg border bg-[var(--bg-card)] p-4">
                 <div>
                   <p className="text-sm font-medium">{persona.name}</p>
-                  <p className="mt-1 text-xs capitalize text-[var(--text-tertiary)]">
-                    {persona.archetype} · {persona.temperament}
+                  <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+                    {capitalize(persona.archetype)} · {capitalize(persona.temperament)}
                   </p>
                   <p className="mt-2 text-xs leading-relaxed text-[var(--text-secondary)]">{persona.brief}</p>
                 </div>
@@ -130,13 +114,13 @@ export default function ScenarioDetailPage() {
               <ul className="mt-2 flex flex-col gap-2">
                 {progress.recent_attempts.map((a) => (
                   <li key={a.session_id}>
-                    <a
+                    <Link
                       href={`/app/sessions/${a.session_id}`}
-                      className="flex items-center justify-between rounded-lg border bg-[var(--bg-card)] px-4 py-2.5 text-sm hover:bg-[var(--bg-raised)]"
+                      className="flex items-center justify-between rounded-lg border bg-[var(--bg-card)] px-4 py-2.5 text-sm transition-colors duration-150 hover:bg-[var(--bg-raised)]"
                     >
-                      <span>{new Date(a.created_at).toLocaleDateString()}</span>
+                      <LocalDate value={a.created_at} relative />
                       <ScoreBadge score={a.overall_score} />
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -144,12 +128,14 @@ export default function ScenarioDetailPage() {
           )}
         </div>
 
-        <aside className="h-fit rounded-lg border bg-[var(--bg-card)] p-4">
+        <aside className="h-fit rounded-lg border bg-[var(--bg-card)] p-4 lg:sticky lg:top-6">
           <p className="text-sm font-medium">Ready when you are</p>
           <dl className="mt-3 flex flex-col gap-2 text-xs text-[var(--text-secondary)]">
             <div className="flex justify-between">
               <dt>Difficulty</dt>
-              <dd className="capitalize">{scenario.difficulty}</dd>
+              <dd>
+                <DifficultyMeter difficulty={scenario.difficulty} />
+              </dd>
             </div>
             <div className="flex justify-between">
               <dt>Expected length</dt>
@@ -171,7 +157,7 @@ export default function ScenarioDetailPage() {
         </aside>
       </div>
 
-      {showStart && <StartSessionDialog scenario={scenario} onClose={() => setShowStart(false)} />}
+      <StartSessionDialog open={showStart} scenario={scenario} onClose={() => setShowStart(false)} />
     </div>
   );
 }

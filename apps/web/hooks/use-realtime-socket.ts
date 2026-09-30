@@ -44,6 +44,7 @@ export function useRealtimeSocket(sessionId: string): UseRealtimeSocket {
   const setUserPartialCaption = usePracticeStore((s) => s.setUserPartialCaption);
   const appendPersonaCaption = usePracticeStore((s) => s.appendPersonaCaption);
   const setEnded = usePracticeStore((s) => s.setEnded);
+  const noteTurnFinalized = usePracticeStore((s) => s.noteTurnFinalized);
   const setDistressExitPending = usePracticeStore((s) => s.setDistressExitPending);
   const pushToast = useToastStore((s) => s.push);
 
@@ -75,6 +76,7 @@ export function useRealtimeSocket(sessionId: string): UseRealtimeSocket {
           setUserPartialCaption(msg.text);
           break;
         case "turn_finalized":
+          noteTurnFinalized(msg.turn_index);
           break;
         case "audio_chunk_meta":
           correlatorRef.current.observeMeta(msg.turn_id);
@@ -117,6 +119,7 @@ export function useRealtimeSocket(sessionId: string): UseRealtimeSocket {
       setUserPartialCaption,
       appendPersonaCaption,
       setEnded,
+      noteTurnFinalized,
       setDistressExitPending,
       pushToast,
       flushCompletedChunk,

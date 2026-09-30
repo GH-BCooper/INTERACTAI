@@ -14,26 +14,51 @@
  * is treated as a placeholder that the client is expected to correct: `suppressHydrationWarning`
  * tells React that this one text node is legitimately environment-dependent, and the viewer's
  * locale wins after hydration. The machine-readable value goes in `dateTime` either way.
+ *
+ * `relative` renders "2 days ago" (lists), with the absolute date in the tooltip.
  */
 export function LocalDate({
   value,
   withTime = false,
+  relative = false,
   options,
 }: {
   value: string;
   withTime?: boolean;
+  relative?: boolean;
   options?: Intl.DateTimeFormatOptions;
 }) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return <>—</>;
-  const text = options
+  const absolute = options
     ? date.toLocaleDateString(undefined, options)
     : withTime
-      ? date.toLocaleString()
-      : date.toLocaleDateString();
+      ? date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+      : date.toLocaleDateString(undefined, { dateStyle: "medium" });
+  const text = relative ? formatRelative(date, new Date()) : absolute;
   return (
-    <time dateTime={date.toISOString()} suppressHydrationWarning>
+    <time dateTime={date.toISOString()} title={relative ? absolute : undefined} suppressHydrationWarning>
       {text}
     </time>
   );
+}
+
+const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["year", 365 * 24 * 3600],
+  ["month", 30 * 24 * 3600],
+  ["week", 7 * 24 * 3600],
+  ["day", 24 * 3600],
+  ["hour", 3600],
+  ["minute", 60],
+];
+
+export function formatRelative(date: Date, now: Date): string {
+  const seconds = Math.round((date.getTime() - now.getTime()) / 1000);
+  const abs = Math.abs(seconds);
+  if (abs < 60) return "just now";
+  const fmt = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  for (const [unit, size] of UNITS) {
+    if (abs >= size) return fmt.format(Math.round(seconds / size), unit);
+  }
+  return "just now";
 }

@@ -1,24 +1,29 @@
 "use client";
 
-import { X } from "lucide-react";
+import { clsx } from "clsx";
+import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 import { useEffect } from "react";
 
-import { useToastStore } from "@/stores/toast-store";
+import { useToastStore, type Toast } from "@/stores/toast-store";
 
 const AUTO_DISMISS_MS = 6000;
 
-function ToastCard({
-  id,
-  title,
-  description,
-  action,
-}: {
-  id: string;
-  title: string;
-  description?: string;
-  action?: { label: string; onClick: () => void };
-}) {
+const VARIANT_ICON = {
+  info: Info,
+  success: CheckCircle2,
+  error: AlertCircle,
+} as const;
+
+// Status colours, never --score-* (a toast is never a rubric judgement).
+const VARIANT_ICON_CLASS = {
+  info: "text-[var(--accent)]",
+  success: "text-[var(--status-ok)]",
+  error: "text-[var(--status-bad)]",
+} as const;
+
+function ToastCard({ id, title, description, action, variant = "info" }: Toast) {
   const dismiss = useToastStore((s) => s.dismiss);
+  const Icon = VARIANT_ICON[variant];
 
   useEffect(() => {
     const timer = setTimeout(() => dismiss(id), AUTO_DISMISS_MS);
@@ -27,11 +32,11 @@ function ToastCard({
 
   return (
     <div
-      role="status"
-      className="flex w-80 items-start gap-3 rounded-lg border bg-[var(--bg-raised)] p-4 text-[var(--text-primary)] shadow-none"
-      style={{ borderColor: "var(--border)" }}
+      role={variant === "error" ? "alert" : "status"}
+      className="flex w-80 max-w-[calc(100vw-2rem)] items-start gap-3 rounded-lg border bg-[var(--bg-raised)] p-4 text-[var(--text-primary)] animate-toast-in"
     >
-      <div className="flex-1">
+      <Icon size={16} aria-hidden className={clsx("mt-0.5 shrink-0", VARIANT_ICON_CLASS[variant])} />
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{title}</p>
         {description && <p className="mt-1 text-xs text-[var(--text-secondary)]">{description}</p>}
         {action && (
@@ -68,7 +73,7 @@ export function ToastRegion() {
     <div
       aria-live="polite"
       aria-atomic="false"
-      className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2"
+      className="pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col gap-2"
     >
       {toasts.map((t) => (
         <div key={t.id} className="pointer-events-auto">

@@ -13,12 +13,14 @@ export function VerdictBlock({ report, onSeekMs, turnStartMs }: {
   onSeekMs: (ms: number) => void;
   turnStartMs: (turnId: string) => number | null;
 }) {
-  if (report.status === "pending") {
+  if (report.status === "pending") return <ScoringInProgress />;
+  if (report.status === "failed") {
     return (
-      <div className="animate-pulse rounded-lg border bg-[var(--bg-card)] p-4">
-        <div className="h-4 w-2/3 rounded bg-[var(--bg-raised)]" />
-        <div className="mt-3 h-3 w-full rounded bg-[var(--bg-raised)]" />
-        <div className="mt-2 h-3 w-5/6 rounded bg-[var(--bg-raised)]" />
+      <div role="status" className="rounded-lg border bg-[var(--bg-card)] p-4">
+        <p className="text-sm font-medium">The written summary couldn&apos;t be generated</p>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
+          Your transcript, recording and any scores below are unaffected. Practise again to get a fresh report.
+        </p>
       </div>
     );
   }
@@ -79,6 +81,23 @@ export function VerdictBlock({ report, onSeekMs, turnStartMs }: {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+/** docs/ui-audit-2026-09.md §9: while the coach is still working (it runs off the latency path;
+ * hooks.ts polls every 4 s), say so plainly instead of a skeleton that looks stuck. The bar is
+ * indeterminate on purpose: there is no real progress number to show. */
+export function ScoringInProgress() {
+  return (
+    <div role="status" aria-live="polite" className="rounded-lg border bg-[var(--bg-card)] p-4">
+      <p className="text-sm font-medium">Scoring your answers…</p>
+      <p className="mt-1 text-sm text-[var(--text-secondary)]">
+        Usually under a minute. This page updates by itself, so you can keep reading the transcript meanwhile.
+      </p>
+      <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-[var(--bg-raised)]">
+        <div className="h-full w-1/3 animate-thinking rounded-full bg-[var(--accent)]" />
+      </div>
     </div>
   );
 }

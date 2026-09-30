@@ -1,22 +1,27 @@
-import { Button } from "@/components/ui/button";
+import { Wand2 } from "lucide-react";
+import type { Metadata } from "next";
 
-// Task 4.2: "A prominent Custom scenario entry sits at the end of the grid... the card renders
-// and links to a 'coming soon' state; do not build the authoring flow." P1 — deliberately not
-// built out further here.
+import { ButtonLink } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/primitives";
+
+export const metadata: Metadata = { title: "Custom scenario" };
+
+// Task 4.2: authoring is P1 and not built (POST /scenarios returns 501). The library no longer
+// links here (docs/ui-audit-2026-09.md §6); this stays only so an old bookmark gets an honest
+// page instead of a 404.
 export default function CustomScenarioComingSoonPage() {
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center">
-      <h1 className="text-lg font-medium">Custom scenarios are coming soon</h1>
-      <p className="text-sm text-[var(--text-secondary)]">
-        Authoring your own scenario — a custom brief, persona and rubric — isn&apos;t built yet.
-        For now, pick the closest scenario from the library and adjust the difficulty and focus
-        areas when you start.
-      </p>
-      <a href="/app/scenarios">
-        <Button variant="primary" size="sm" className="mt-2">
-          Back to the library
-        </Button>
-      </a>
+    <div className="mx-auto max-w-lg px-4 py-16 sm:px-6">
+      <EmptyState
+        icon={<Wand2 size={18} />}
+        title="Custom scenarios aren't available yet"
+        body="Authoring your own brief, persona and rubric isn't built. For now, pick the closest scenario in the library and set the difficulty when you start."
+        action={
+          <ButtonLink href="/app/scenarios" variant="primary" size="sm">
+            Back to the library
+          </ButtonLink>
+        }
+      />
     </div>
   );
 }
