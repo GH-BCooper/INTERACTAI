@@ -54,6 +54,16 @@ async def delete_prefix(prefix: str) -> int:
     return await asyncio.to_thread(_delete_prefix_sync, prefix)
 
 
+def _delete_object_sync(key: str) -> None:
+    settings = get_settings()
+    get_s3_client().delete_object(Bucket=settings.s3_bucket, Key=key)
+
+
+async def delete_object(key: str) -> None:
+    """Deletes one object. S3 `DeleteObject` succeeds on a missing key, so this is idempotent."""
+    await asyncio.to_thread(_delete_object_sync, key)
+
+
 def presign_get_url(key: str, *, expires_in: int = RECORDING_URL_TTL_SECONDS) -> str:
     """Task 3.3a/3.3f: the report player fetches the recording directly from S3/MinIO via this
     URL — api mints it but never reads the object's bytes itself (CLAUDE.md §2: api never

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
 from ..core.db import get_db
-from ..core.exceptions import AppError, AuthInvalidTokenError, AuthProviderError, NotFoundError
+from ..core.exceptions import AppError, AuthInvalidTokenError, NotFoundError
 from ..core.rate_limit import enforce_rate_limit
 from ..core.redis_client import get_redis
 from ..core.security import (
@@ -100,8 +100,9 @@ async def callback(
     provider: Literal["github", "google"],
     db: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[Redis, Depends(get_redis)],
-    code: Annotated[str, Query()],
-    state: Annotated[str, Query()],
+    code: Annotated[str | None, Query()] = None,
+    state: Annotated[str | None, Query()] = None,
+    error: Annotated[str | None, Query(max_length=100)] = None,
 ) -> Response:
     """The OAuth provider redirects the browser here directly (this is a top-level navigation,
     not a fetch a frontend origin could intercept) — so this handler's job isn't to hand the
@@ -118,13 +119,25 @@ async def callback(
     minutes."""
     settings = get_settings()
 
+    # A failure here is a top-level navigation, so a JSON error body would strand the user on a
+    # bare API response. Send them back to the sign-in page with a code it knows how to explain
+    # (docs/ui-audit-2026-09.md §2). `error` is what the provider sends when the user cancels.
+    def _fail(error_code: str) -> Response:
+        location = f"{settings.web_origin}/signin?error={error_code}"
+        return Response(status_code=307, headers={"Location": location})
+
+    if error is not None or not code or not state:
+        return _fail("access_denied" if error == "access_denied" else "provider_error")
     if not await consume_oauth_state(redis, state):
-        raise AuthProviderError(provider, "OAuth state was missing, expired or already used.")
+        return _fail("state_expired")
 
     redirect_uri = f"{settings.api_base_url}/auth/{provider}/callback"
-    user_info = await auth_service.exchange_code_for_user(
-        provider, code=code, redirect_uri=redirect_uri
-    )
+    try:
+        user_info = await auth_service.exchange_code_for_user(
+            provider, code=code, redirect_uri=redirect_uri
+        )
+    except AppError:
+        return _fail("provider_error")
 
     user = await user_service.find_or_link_or_create_oauth_user(
         db,

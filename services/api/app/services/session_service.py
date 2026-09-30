@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid as std_uuid
 from collections import defaultdict
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.config import get_settings
 from ..core.exceptions import NotFoundError, RateLimitedError
 from ..core.rate_limit import enforce_rate_limit
-from ..core.s3 import presign_get_url
+from ..core.s3 import delete_object, presign_get_url
 from ..models import (
     Annotation,
     Consent,
@@ -31,6 +32,8 @@ from ..schemas.session import (
     NextActionOut,
     RecordingOut,
     ReportOut,
+    SessionExportOut,
+    SessionListItemOut,
     SessionOut,
     SessionScoreOut,
     TurnMetricsOut,
@@ -206,21 +209,72 @@ async def create_session(
 
 
 async def list_sessions(
-    db: AsyncSession, user_id: std_uuid.UUID, *, limit: int, offset: int
+    db: AsyncSession,
+    user_id: std_uuid.UUID,
+    *,
+    limit: int,
+    offset: int,
+    family: str | None = None,
+    query: str | None = None,
 ) -> tuple[list[Session], int]:
-    total_result = await db.execute(
-        select(func.count()).select_from(Session).where(Session.user_id == user_id)
-    )
+    """`family` and `query` filter on the frozen brief (what the session actually was), so a
+    re-titled scenario never silently moves old sessions in or out of a filter."""
+    conditions = [Session.user_id == user_id]
+    if family:
+        conditions.append(Session.brief["scenario_family"].astext == family)
+    if query and query.strip():
+        conditions.append(Session.brief["scenario_title"].astext.ilike(f"%{query.strip()}%"))
+
+    total_result = await db.execute(select(func.count()).select_from(Session).where(*conditions))
     total = int(total_result.scalar_one())
 
     result = await db.execute(
         select(Session)
-        .where(Session.user_id == user_id)
+        .where(*conditions)
         .order_by(Session.created_at.desc())
         .limit(limit)
         .offset(offset)
     )
     return list(result.scalars().all()), total
+
+
+async def session_list_items(db: AsyncSession, sessions: list[Session]) -> list[SessionListItemOut]:
+    """Enriches a page of sessions with title/family/difficulty (from the frozen brief), the
+    overall score and the report status: two batched queries for the whole page, not per row."""
+    ids = [s.id for s in sessions]
+    scores_by_session: dict[std_uuid.UUID, list[SessionScore]] = defaultdict(list)
+    report_status: dict[std_uuid.UUID, str] = {}
+    if ids:
+        scores_result = await db.execute(
+            select(SessionScore).where(SessionScore.session_id.in_(ids))
+        )
+        for row in scores_result.scalars().all():
+            scores_by_session[row.session_id].append(row)
+        reports_result = await db.execute(
+            select(Report.session_id, Report.status).where(Report.session_id.in_(ids))
+        )
+        report_status = {sid: status for sid, status in reports_result.tuples().all()}
+
+    return [
+        session_to_list_item(s, scores_by_session.get(s.id, []), report_status.get(s.id))
+        for s in sessions
+    ]
+
+
+def session_to_list_item(
+    session: Session, scores: list[SessionScore], report_status: str | None
+) -> SessionListItemOut:
+    brief = session.brief or {}
+    family = brief.get("scenario_family")
+    difficulty = brief.get("difficulty")
+    return SessionListItemOut(
+        **session_to_out(session).model_dump(),
+        scenario_title=str(brief.get("scenario_title") or "Practice session"),
+        scenario_family=str(family) if family is not None else None,
+        difficulty=str(difficulty) if difficulty is not None else None,
+        overall_score=compute_overall_score(scores)[0],
+        report_status=report_status,
+    )
 
 
 async def get_session_by_id(db: AsyncSession, session_id: std_uuid.UUID) -> Session | None:
@@ -392,6 +446,33 @@ def get_recording(session: Session) -> RecordingOut:
         format=cast(Literal["wav", "opus"], session.recording_format),
         peaks=session.peaks,
         duration_ms=session.duration_ms,
+    )
+
+
+async def delete_recording(db: AsyncSession, session: Session) -> None:
+    """`DELETE /sessions/{id}/recording`. CLAUDE.md §10: "Deletion is genuine, including object
+    storage." The object is removed first and the columns cleared only after that succeeds, so a
+    storage failure can never leave a row claiming "deleted" over audio that still exists.
+    Peaks go too, since they are derived from the audio. Idempotent when nothing is stored."""
+    if session.recording_key is not None:
+        await asyncio.wait_for(delete_object(session.recording_key), timeout=15)
+    session.recording_key = None
+    session.recording_format = None
+    session.peaks = None
+    await db.flush()
+
+
+async def export_session(db: AsyncSession, session: Session) -> SessionExportOut:
+    """`GET /sessions/{id}/export`: this one session as JSON. No audio (CLAUDE.md §8), and the
+    scores are exactly what the report shows, already gated and never re-derived here."""
+    items = await session_list_items(db, [session])
+    report = await get_report(db, session.id)
+    return SessionExportOut(
+        exported_at=datetime.now(UTC),
+        session=items[0],
+        report=report_to_out(report) if report is not None else None,
+        scores=await list_session_scores(db, session),
+        turns=await list_turns_with_scores(db, session.id),
     )
 
 

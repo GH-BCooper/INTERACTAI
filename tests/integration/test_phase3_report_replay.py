@@ -507,3 +507,133 @@ class TestOAuthCallbackRedirect:
         assert location.startswith(f"{settings_web_origin}/auth/callback#token=")
         assert "expires_in=" in location
         assert "interactai_refresh" in resp.headers.get("set-cookie", "")
+
+
+class TestDeleteRecording:
+    """docs/ui-audit-2026-09.md §9: "Delete recording" is a privacy commitment (CLAUDE.md §10:
+    "Deletion is genuine, including object storage"), so this checks the object is really gone
+    from MinIO, not just that the row was cleared."""
+
+    async def test_delete_removes_the_object_and_clears_the_row(
+        self, app_client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        from botocore.exceptions import ClientError
+
+        from services.api.app.core.config import get_settings
+        from services.api.app.core.s3 import get_s3_client
+
+        user = await _make_user(db_session, "delete-recording@example.com")
+        session, _turn_id, _key = await _seed_session_with_rubric(db_session, user=user)
+        key = f"users/{user.id}/sessions/{session.id}.opus"
+        bucket = get_settings().s3_bucket
+        get_s3_client().put_object(Bucket=bucket, Key=key, Body=b"not really opus")
+        session.recording_key = key
+        session.recording_format = "opus"
+        session.peaks = [0.1, 0.2]
+        await db_session.commit()
+
+        token = create_access_token(str(user.id))
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = await app_client.delete(f"/sessions/{session.id}/recording", headers=headers)
+        assert resp.status_code == 204, resp.text
+
+        with pytest.raises(ClientError):
+            get_s3_client().head_object(Bucket=bucket, Key=key)
+
+        recording = (
+            await app_client.get(f"/sessions/{session.id}/recording", headers=headers)
+        ).json()
+        assert recording["url"] is None
+        assert recording["peaks"] is None
+
+        # Idempotent: deleting again is still a 204, not an error.
+        again = await app_client.delete(f"/sessions/{session.id}/recording", headers=headers)
+        assert again.status_code == 204
+
+    async def test_delete_forbidden_for_non_owner(
+        self, app_client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        owner = await _make_user(db_session, "rec-owner@example.com")
+        other = await _make_user(db_session, "rec-other@example.com")
+        session, _turn_id, _key = await _seed_session_with_rubric(db_session, user=owner)
+        await db_session.commit()
+
+        token = create_access_token(str(other.id))
+        resp = await app_client.delete(
+            f"/sessions/{session.id}/recording", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code == 403
+
+
+class TestSessionExport:
+    async def test_export_bundles_session_report_scores_and_turns(
+        self, app_client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        user = await _make_user(db_session, "export-session@example.com")
+        session, turn_id, _key = await _seed_session_with_rubric(db_session, user=user)
+        session.brief = {**session.brief, "scenario_title": "Pushback", "difficulty": "hard"}
+        await db_session.commit()
+
+        token = create_access_token(str(user.id))
+        resp = await app_client.get(
+            f"/sessions/{session.id}/export", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["session"]["id"] == str(session.id)
+        assert body["session"]["scenario_title"] == "Pushback"
+        assert body["report"] is None
+        assert str(turn_id) in [t["id"] for t in body["turns"]]
+        assert isinstance(body["scores"], list)
+
+
+class TestSessionListItems:
+    async def test_list_rows_carry_title_difficulty_and_filter_by_family_and_query(
+        self, app_client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        user = await _make_user(db_session, "list-items@example.com")
+        session, _turn_id, _key = await _seed_session_with_rubric(db_session, user=user)
+        session.brief = {
+            **session.brief,
+            "scenario_title": "System design warm-up",
+            "scenario_family": "technical",
+            "difficulty": "gentle",
+        }
+        await db_session.commit()
+
+        headers = {"Authorization": f"Bearer {create_access_token(str(user.id))}"}
+        body = (await app_client.get("/sessions", headers=headers)).json()
+        row = next(r for r in body["items"] if r["id"] == str(session.id))
+        assert row["scenario_title"] == "System design warm-up"
+        assert row["scenario_family"] == "technical"
+        assert row["difficulty"] == "gentle"
+        assert row["overall_score"] is None  # nothing scored: never a fabricated number
+        assert row["report_status"] is None
+
+        by_family = (await app_client.get("/sessions?family=behavioural", headers=headers)).json()
+        assert by_family["total"] == 0
+        by_query = (await app_client.get("/sessions?q=design", headers=headers)).json()
+        assert by_query["total"] == 1
+
+
+class TestOAuthCallbackFailure:
+    async def test_cancelled_sign_in_goes_back_to_signin_with_a_code(
+        self, app_client: AsyncClient
+    ) -> None:
+        import app.routers.auth as auth_router
+
+        resp = await app_client.get(
+            "/auth/github/callback", params={"error": "access_denied"}, follow_redirects=False
+        )
+        assert resp.status_code == 307
+        web_origin = auth_router.get_settings().web_origin
+        assert resp.headers["location"] == f"{web_origin}/signin?error=access_denied"
+
+    async def test_unknown_state_goes_back_to_signin(self, app_client: AsyncClient) -> None:
+        resp = await app_client.get(
+            "/auth/github/callback",
+            params={"code": "c", "state": "never-issued"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 307
+        assert resp.headers["location"].endswith("/signin?error=state_expired")

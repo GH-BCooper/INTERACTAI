@@ -566,6 +566,63 @@ class TestProgressWeakestDimensionUsesTrendNotAbsolute:
         assert resp.json()["family"] == "technical"  # attempted twice, vs. negotiation once
 
 
+class TestProgressAllFamilies:
+    async def test_explicit_all_spans_every_family(
+        self, app_client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        """docs/ui-audit-2026-09.md §10: an explicit "All" tab. Trends combine every family;
+        the default (no param) is still the most-practised family, never "all"."""
+        user = await _make_user(db_session, "progress-all@example.com")
+        rubric = await _make_rubric(db_session, criteria=["structure"])
+        tech = await _make_scenario(
+            db_session, family="technical", difficulty="standard", rubric=rubric
+        )
+        neg = await _make_scenario(
+            db_session, family="negotiation", difficulty="standard", rubric=rubric
+        )
+        now = datetime.now(UTC)
+        await _make_closed_session(
+            db_session,
+            user=user,
+            scenario=tech,
+            rubric=rubric,
+            created_at=now - timedelta(days=2),
+            scores={"structure": 4.0},
+        )
+        await _make_closed_session(
+            db_session,
+            user=user,
+            scenario=neg,
+            rubric=rubric,
+            created_at=now - timedelta(days=1),
+            scores={"structure": 3.0},
+        )
+        await db_session.commit()
+
+        resp = await app_client.get(
+            "/me/progress", headers=_auth_headers(user), params={"family": "all"}
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["family"] == "all"
+        (trend,) = body["criterion_trends"]
+        assert [p["score"] for p in trend["points"]] == [4.0, 3.0]  # both families, oldest first
+
+
+class TestDashboardStripExtras:
+    async def test_strip_carries_last_week_minutes_and_weakest_key(
+        self, app_client: AsyncClient, db_session: AsyncSession
+    ) -> None:
+        user = await _make_user(db_session, "strip-extras@example.com")
+        resp = await app_client.get("/me/dashboard", headers=_auth_headers(user))
+        assert resp.status_code == 200, resp.text
+        strip = resp.json()["progress_strip"]
+        # A new user: measured zeros and nulls, never a placeholder (CLAUDE.md §1.10).
+        assert strip["total_minutes_last_week"] == 0
+        assert strip["weakest_criterion_key"] is None
+        assert strip["weakest_criterion_family"] is None
+
+
 class TestScenarioProgress:
     async def test_best_score_reflects_the_highest_of_multiple_attempts(
         self, app_client: AsyncClient, db_session: AsyncSession

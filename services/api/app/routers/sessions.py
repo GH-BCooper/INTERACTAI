@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from redis.asyncio import Redis
 
 from ..core.config import get_settings
@@ -21,6 +21,8 @@ from ..schemas.session import (
     ReportOut,
     RetryCreate,
     SessionCreate,
+    SessionExportOut,
+    SessionListItemOut,
     SessionOut,
     SessionScoreOut,
     TurnOut,
@@ -53,16 +55,20 @@ async def create_session(
     return session_service.session_to_out(session)
 
 
-@router.get("", response_model=Page[SessionOut])
+@router.get("", response_model=Page[SessionListItemOut])
 async def list_sessions(
     user: CurrentUser,
     db: DbSession,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
-) -> Page[SessionOut]:
-    sessions, total = await session_service.list_sessions(db, user.id, limit=limit, offset=offset)
+    family: Annotated[str | None, Query(max_length=40)] = None,
+    q: Annotated[str | None, Query(max_length=100)] = None,
+) -> Page[SessionListItemOut]:
+    sessions, total = await session_service.list_sessions(
+        db, user.id, limit=limit, offset=offset, family=family, query=q
+    )
     return Page(
-        items=[session_service.session_to_out(s) for s in sessions],
+        items=await session_service.session_list_items(db, sessions),
         total=total,
         limit=limit,
         offset=offset,
@@ -146,6 +152,22 @@ async def get_session_scores(
 async def get_session_recording(session_id: UUID, user: CurrentUser, db: DbSession) -> RecordingOut:
     session = await _get_owned_or_raise(db, user, session_id)
     return session_service.get_recording(session)
+
+
+@router.delete("/{session_id}/recording", status_code=204)
+async def delete_session_recording(session_id: UUID, user: CurrentUser, db: DbSession) -> Response:
+    """Deletes this session's recording from object storage and clears it from the row. The
+    transcript, scores and report are unaffected (persona audio is never stored anyway)."""
+    session = await _get_owned_or_raise(db, user, session_id)
+    await session_service.delete_recording(db, session)
+    await db.commit()
+    return Response(status_code=204)
+
+
+@router.get("/{session_id}/export", response_model=SessionExportOut)
+async def export_session(session_id: UUID, user: CurrentUser, db: DbSession) -> SessionExportOut:
+    session = await _get_owned_or_raise(db, user, session_id)
+    return await session_service.export_session(db, session)
 
 
 @router.post("/{session_id}/annotations", response_model=AnnotationOut, status_code=201)

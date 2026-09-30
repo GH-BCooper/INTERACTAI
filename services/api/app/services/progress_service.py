@@ -10,7 +10,7 @@ import uuid as std_uuid
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Report, Scenario, Session, SessionScore, User
@@ -342,6 +342,15 @@ async def get_dashboard(db: AsyncSession, user: User) -> DashboardOut:
     )
     sessions_this_week = len(list(sessions_this_week_result.scalars().all()))
     total_minutes = await session_service.practice_minutes_this_week(db, user.id)
+    last_week_result = await db.execute(
+        select(func.coalesce(func.sum(Session.duration_ms), 0)).where(
+            Session.user_id == user.id,
+            Session.created_at >= week_start - timedelta(days=7),
+            Session.created_at < week_start,
+            Session.duration_ms.is_not(None),
+        )
+    )
+    minutes_last_week = int(last_week_result.scalar_one() or 0) // 60_000
 
     recent_result = await db.execute(
         select(Session)
@@ -388,9 +397,12 @@ async def get_dashboard(db: AsyncSession, user: User) -> DashboardOut:
         progress_strip=ProgressStripOut(
             sessions_this_week=sessions_this_week,
             total_minutes_this_week=total_minutes,
+            total_minutes_last_week=minutes_last_week,
             overall_score=overall_score,
             overall_score_delta=delta,
             weakest_criterion_name=weakest_name,
+            weakest_criterion_key=trend[1] if trend is not None else None,
+            weakest_criterion_family=trend[2] if trend is not None else None,
         ),
         recent_sessions=recent_out,
         attention=attention,
@@ -420,6 +432,9 @@ async def get_scenario_progress(
 
 
 # ── Task 4.4 — progress page ─────────────────────────────────────────────────────────────────
+
+
+ALL_FAMILIES = "all"
 
 
 def _weekly_volume(sessions: list[tuple[Session, Scenario]]) -> list[WeeklyVolumePointOut]:
@@ -452,8 +467,11 @@ async def get_progress(db: AsyncSession, user: User, family: str | None) -> Prog
             else (families_available[0] if families_available else FALLBACK_FAMILY)
         )
 
+    # "all" is an explicit choice only (docs/ui-audit-2026-09.md §10) — never the default above.
+    filter_family = None if resolved_family == ALL_FAMILIES else resolved_family
+
     names = await _criterion_names(db)
-    history = await _criterion_history(db, user.id, family=resolved_family)
+    history = await _criterion_history(db, user.id, family=filter_family)
 
     criterion_trends = [
         CriterionTrendOut(
@@ -467,7 +485,7 @@ async def get_progress(db: AsyncSession, user: User, family: str | None) -> Prog
         for key, points in sorted(history.items())
     ]
 
-    weakest = await weakest_trending_criterion(db, user.id, family=resolved_family)
+    weakest = await weakest_trending_criterion(db, user.id, family=filter_family)
     weakest_out = None
     if weakest is not None:
         trend_value, key, _fam = weakest
@@ -476,7 +494,11 @@ async def get_progress(db: AsyncSession, user: User, family: str | None) -> Prog
             criterion_key=key,
             name=name,
             trend=trend_value,
-            next_action=f"Practise another {resolved_family} scenario focused on {name.lower()}.",
+            next_action=(
+                f"Practise another {resolved_family} scenario focused on {name.lower()}."
+                if filter_family is not None
+                else f"Practise a scenario focused on {name.lower()}."
+            ),
         )
 
     personal_bests: list[PersonalBestOut] = []

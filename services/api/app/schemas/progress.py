@@ -22,9 +22,12 @@ class RecommendationOut(BaseModel):
 class ProgressStripOut(BaseModel):
     sessions_this_week: int
     total_minutes_this_week: int
+    total_minutes_last_week: int
     overall_score: float | None
     overall_score_delta: float | None
     weakest_criterion_name: str | None
+    weakest_criterion_key: str | None
+    weakest_criterion_family: str | None
 
 
 class RecentSessionOut(BaseModel):

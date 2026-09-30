@@ -45,6 +45,20 @@ class SessionOut(BaseModel):
     retry_of_turn_id: UUID | None
 
 
+class SessionListItemOut(SessionOut):
+    """`GET /sessions` rows (docs/ui-audit-2026-09.md §8): everything the history list and the
+    command palette need to make a row scannable, without a round trip per row. Title, family and
+    difficulty come from the session's frozen brief (what the session actually was, not what the
+    scenario says today). `overall_score` is the same confidence-weighted rollup the dashboard
+    uses, and `None` whenever no criterion had enough signal (CLAUDE.md §1.6)."""
+
+    scenario_title: str
+    scenario_family: str | None
+    difficulty: str | None
+    overall_score: float | None
+    report_status: str | None
+
+
 class WsTokenOut(BaseModel):
     token: str
     expires_in: int
@@ -184,3 +198,14 @@ class RetryCreate(BaseModel):
     scenario and difficulty as the turn it re-asks."""
 
     turn_id: UUID
+
+
+class SessionExportOut(BaseModel):
+    """`GET /sessions/{id}/export` — one session's archive: the same shape `/me/export` uses per
+    session, plus the report and the session-level scores. No audio (CLAUDE.md §8)."""
+
+    exported_at: datetime
+    session: SessionListItemOut
+    report: ReportOut | None
+    scores: list[SessionScoreOut]
+    turns: list[TurnOut]
